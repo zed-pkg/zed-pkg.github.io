@@ -1,0 +1,55 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "zed-pkg — install packages, not repositories",
+  description = "zed-pkg is the universal package manager backed by the VCS hosts you already use: git, hg, jj and friends on GitHub, GitLab, Bitbucket, Codeberg, or your own servers. Lean, tag-verified artifacts; pnpm-style symlinks; container-first installs; self-hostable.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body>
+    <nav>
+      <div class="wrap nav-inner">
+        <a class="brand" href="/">
+          <img src="/logo-mark.svg" alt="" />
+          <span>zed<span class="accent">-pkg</span></span>
+        </a>
+        <div class="nav-links">
+          <a href="#how">How it works</a>
+          <a href="#containers">Containers</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#repos">Repos</a>
+          <a href="https://github.com/zed-pkg">GitHub</a>
+        </div>
+      </div>
+    </nav>
+    <slot />
+    <footer>
+      <div class="wrap footer-inner">
+        <img src="/logo-mark.svg" alt="zed-pkg" />
+        <span>(c) 2026 zed-pkg contributors - MIT - built in Rust</span>
+        <div class="links">
+          <a href="https://zpkg.tech">zpkg.tech</a>
+          <a href="https://github.com/zed-pkg">github.com/zed-pkg</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
