@@ -1,0 +1,52 @@
+.brand {
+  flex-shrink: 0;
+}
+
+.nav-links {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.hero > *,
+.grid > *,
+.steps > *,
+.term,
+.card,
+.step,
+.repo,
+.footer-inner .links {
+  min-width: 0;
+}
+
+.footer-inner .links {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 560px) {
+  .wrap {
+    padding-inline: 16px;
+  }
+
+  .nav-inner {
+    gap: 14px;
+  }
+
+  .nav-links {
+    gap: 12px;
+    font-size: 0.82rem;
+  }
+
+  .term-bar .title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
