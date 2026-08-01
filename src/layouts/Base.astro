@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import "../styles/mobile-hardening.css";
 
 interface Props {
   title?: string;
@@ -31,8 +32,9 @@ const {
           <img src="/logo-mark.svg" alt="" />
           <span>zed<span class="accent">-pkg</span></span>
         </a>
-        <div class="nav-links">
+        <div class="nav-links" aria-label="Primary navigation">
           <a href="#how">How it works</a>
+          <a href="#review">Release review</a>
           <a href="#containers">Containers</a>
           <a href="#pricing">Pricing</a>
           <a href="#repos">Repos</a>
