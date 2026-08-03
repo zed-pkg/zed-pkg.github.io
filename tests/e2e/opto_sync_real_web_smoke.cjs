@@ -153,7 +153,7 @@ async function openApplication() {
       (entry) => entry.scope,
     );
   });
-  if (extension || registrations.length > 0) {
+  if (!extension && registrations.length > 0) {
     await page.waitForTimeout(750);
     await context.setOffline(true);
     await page.reload({waitUntil: 'domcontentloaded', timeout: 20_000});
@@ -197,7 +197,8 @@ async function openApplication() {
         title: shell.title,
         serviceWorkers: registrations.length,
         indexedDbRoundTrip: true,
-        offlineReload: extension || registrations.length > 0,
+        offlineReload: !extension && registrations.length > 0,
+        extensionReload: extension,
       },
       null,
       2,
