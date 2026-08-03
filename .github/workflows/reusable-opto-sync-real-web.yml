@@ -12,7 +12,7 @@ concurrency:
 
 env:
   PLAYWRIGHT_VERSION: 1.56.0
-  WEB_HARNESS_SHA: fd80220cfe8b9d553959bb621419491ee9167c11
+  WEB_HARNESS_SHA: a2847171bf7b119c84f067322affc37a15632ccf
 
 jobs:
   browser-e2e:
