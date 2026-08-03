@@ -1,0 +1,114 @@
+name: real web application e2e
+
+on:
+  pull_request:
+    paths:
+      - '**/*.html'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.css'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tests/e2e/opto_sync_real_web_smoke.cjs'
+      - '.github/workflows/opto-sync-real-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLAYWRIGHT_VERSION: 1.56.0
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Run repository tests and production build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package.json ]]; then
+            if [[ -f package-lock.json ]]; then
+              npm ci
+            else
+              npm install
+            fi
+            npm test --if-present
+            npm run build --if-present
+          fi
+
+      - name: Locate browser shell
+        id: shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import pathlib
+          candidates = [
+              pathlib.Path('dist'),
+              pathlib.Path('build'),
+              pathlib.Path('out'),
+              pathlib.Path('public'),
+              pathlib.Path('.'),
+          ]
+          for root in candidates:
+              if not root.is_dir():
+                  continue
+              for page in ('index.html', 'popup.html', 'options.html'):
+                  if (root / page).is_file():
+                      mode = 'extension' if (root / 'manifest.json').is_file() else 'http'
+                      print('root=' + str(root.resolve()))
+                      print('page=' + page)
+                      print('mode=' + mode)
+                      raise SystemExit(0)
+          raise SystemExit('no index.html, popup.html, or options.html found after build')
+          PY
+
+      - name: Install pinned Chromium and Playwright
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/opto-browser"
+          cd "$RUNNER_TEMP/opto-browser"
+          npm init -y >/dev/null
+          npm install --no-save "playwright@$PLAYWRIGHT_VERSION"
+          npx playwright install --with-deps chromium
+
+      - name: Exercise rendered shell, IndexedDB durability, reload, and offline cache
+        shell: bash
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/opto-browser/node_modules/playwright
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.shell.outputs.mode }}" == extension ]]; then
+            APP_MODE=extension \
+              APP_ROOT="${{ steps.shell.outputs.root }}" \
+              APP_PAGE="${{ steps.shell.outputs.page }}" \
+              xvfb-run -a node tests/e2e/opto_sync_real_web_smoke.cjs
+          else
+            python3 -m http.server 4173 \
+              --bind 127.0.0.1 \
+              --directory "${{ steps.shell.outputs.root }}" \
+              >"$RUNNER_TEMP/opto-http.log" 2>&1 &
+            server_pid=$!
+            trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+            for attempt in $(seq 1 30); do
+              curl -fsS "http://127.0.0.1:4173/${{ steps.shell.outputs.page }}" >/dev/null && break
+              sleep 1
+            done
+            curl -fsS "http://127.0.0.1:4173/${{ steps.shell.outputs.page }}" >/dev/null
+            APP_MODE=http \
+              APP_URL="http://127.0.0.1:4173/${{ steps.shell.outputs.page }}" \
+              node tests/e2e/opto_sync_real_web_smoke.cjs
+          fi
