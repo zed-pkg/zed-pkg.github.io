@@ -2,14 +2,16 @@
 import Base from "../layouts/Base.astro";
 
 const repos = [
-  ["zed-cli", "The `zed` command: install, publish, find, test-local (r2g)"],
+  ["zed-cli", "The `zed` command: install, publish, release planning, find, and test-local (r2g)"],
   ["zed-interfaces", "Contract crate: .zpkg.toml, .zpkg.lock, registry API, JSON Schemas"],
   ["zed-api-server.rs", "Registry REST API in Rust: Postgres + S3/R2 artifact storage"],
   ["zed-web-server.rs", "Registry web UI: MASH stack (Maud, Axum, SeaORM, HTMX)"],
-  ["zed-clients", "SDKs for Rust, TypeScript, Python, and Go"],
+  ["zed-clients", "Ten SDKs: Rust, WebAssembly, TypeScript, Python, Go, Dart, Gleam, Erlang, Java, and Swift"],
   ["zed-sync", "Offline-first sync: optimistic IndexedDB writes to Supabase/Postgres"],
   ["zed-infra", "Terraform (Cloudflare R2, AWS), Argo CD app-of-apps, Kubernetes"],
-  ["zed-monorepo", "Umbrella repo: every zed repo as a submodule under apps/"],
+  ["zed-docs", "Architecture decisions, operational runbooks, and cross-repository contracts"],
+  ["zed-e2e", "Full-stack Playwright, Puppeteer, Selenium, CLI, and deployed-grid verification"],
+  ["zed-monorepo", "Exact-SHA umbrella integration: every maintained repository as a sibling submodule"],
   ["zed-pkg.github.io", "This site (Astro, GitHub Pages)"],
 ];
 ---
@@ -165,6 +167,46 @@ zed_modules/acme/http-kit
     </div>
   </section>
 
+  <section id="review">
+    <div class="wrap">
+      <div class="section-head">
+        <h2><span class="tick">##</span> Plan before publish</h2>
+        <p>
+          Review the exact credential-free release model before any registry
+          write. The same JSON can be retained by CI or rendered as one
+          self-contained offline HTML report with source provenance, exact
+          destination counts, filtering, and no network dependencies.
+        </p>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3><span class="dot"></span>One authoritative release model</h3>
+          <p>
+            <code>zed release plan --json</code> is the machine boundary for
+            Zed artifacts, native registries, and target-scoped forge mirrors.
+            Browser review consumes that model instead of reimplementing
+            release routing in JavaScript.
+          </p>
+          <p data-sdk-matrix>
+            Official registry clients cover Rust, browser WebAssembly,
+            TypeScript, Python, Go, Dart, Gleam, Erlang/OTP, Java, and Swift.
+          </p>
+        </div>
+        <div class="term">
+          <div class="term-bar">
+            <span></span><span></span><span></span>
+            <span class="title">release review</span>
+          </div>
+          <pre><span class="p">$</span> zed release plan --json \
+    &gt; build/release-plan.json
+<span class="b">review</span> Zed + native + forge routes
+<span class="b">retain</span> JSON and offline HTML evidence
+<span class="p">$</span> zed publish</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="containers">
     <div class="wrap">
       <div class="section-head">
@@ -297,7 +339,7 @@ RUN --mount=type=cache,target=/root/.zed-pkg \
       </div>
       <div class="grid">
         {repos.map(([name, desc]) => (
-          <a class="repo" href={`https://github.com/zed-pkg/${name}`}>
+          <a class="repo" data-repo={name} href={`https://github.com/zed-pkg/${name}`}>
             <div class="name">{name}</div>
             <div class="desc">{desc}</div>
           </a>
