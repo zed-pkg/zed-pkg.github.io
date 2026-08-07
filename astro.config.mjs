@@ -1,8 +1,9 @@
 import { defineConfig } from "astro/config";
 
-// Served at https://zed-pkg.github.io via GitHub Pages. When the zpkg.tech
-// custom domain is wired up (CNAME + DNS in zed-infra), switch `site` to
-// https://zpkg.tech and add a public/CNAME file containing `zpkg.tech`.
+// Served at https://zpkg.net (GitHub Pages custom domain; public/CNAME).
+// DNS lives in zed-infra/terraform/cloudflare — see docs/dns-zpkg-net.md
+// there for the cutover runbook. registry.zpkg.net is the API,
+// web.zpkg.net the registry UI; zpkg.tech is parked.
 export default defineConfig({
-  site: "https://zed-pkg.github.io",
+  site: "https://zpkg.net",
 });
