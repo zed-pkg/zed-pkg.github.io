@@ -1,0 +1,450 @@
+name: validate and export Sonus session contract
+
+on:
+  push:
+    branches:
+      - agent/marketing-auth-header-20260810
+    paths:
+      - .github/workflows/validate-sonus-session.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-sonus-session
+  cancel-in-progress: true
+
+env:
+  SONUS_SERVER_SHA: 94a54adef78c037648629700e543fe873f9a38d5
+  SONUS_INTERFACES_SHA: 6a4984ea19bb31cd1af68a67c397efa9a8ce2d3a
+  SONUS_SITE_SHA: 93842d6e62eb977a1c78236cf047aeebf140b8fa
+
+jobs:
+  marketing-site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: sonus-auris/sonus-auris-site.web
+          ref: ${{ env.SONUS_SITE_SHA }}
+          persist-credentials: false
+      - name: Verify immutable site input
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$SONUS_SITE_SHA"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run build and static contract suite
+        run: npm run check
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser contract suite
+        run: npm run test:e2e
+
+  rust-session-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: sonus-auris/sonus-auris-web-server.rs
+          ref: ${{ env.SONUS_SERVER_SHA }}
+          path: sonus-auris-web-server.rs
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: sonus-auris/sonus-auris-interfaces
+          ref: ${{ env.SONUS_INTERFACES_SHA }}
+          path: sonus-auris-interfaces
+          persist-credentials: false
+      - name: Verify immutable Rust inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C sonus-auris-web-server.rs rev-parse HEAD)" = "$SONUS_SERVER_SHA"
+          test "$(git -C sonus-auris-interfaces rev-parse HEAD)" = "$SONUS_INTERFACES_SHA"
+      - name: Apply deterministic session patch
+        working-directory: sonus-auris-web-server.rs
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          app_path = Path("src/app.rs")
+          app = app_path.read_text()
+          app = replace_once(
+              app,
+              "\nconst SESSION_COOKIE: &str = \"sonus_auris_session\";\n",
+              "\nmod marketing_session;\n\nconst SESSION_COOKIE: &str = \"sonus_auris_session\";\n",
+              "module declaration",
+          )
+          app = replace_once(
+              app,
+              "        .route(\"/auth/sign-out\", post(sign_out))\n        .route(\"/dashboard\", get(dashboard))",
+              "        .route(\"/auth/sign-out\", post(sign_out))\n        .route(\"/auth/session/status\", get(marketing_session::status))\n        .route(\"/auth/session/refresh\", post(marketing_session::refresh))\n        .route(\"/dashboard\", get(dashboard))",
+              "session routes",
+          )
+          old_gate = '''    if guarded && !request_is_same_origin(request.headers(), &state.config.public_origin) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "ok": false,
+                "error": "cross_site_request_rejected"
+            })),
+        )
+            .into_response();
+    }
+'''
+          new_gate = '''    let marketing_refresh = marketing_session::is_marketing_refresh(
+        request.method(),
+        request.uri().path(),
+        request.headers(),
+    );
+
+    if guarded
+        && !request_is_same_origin(request.headers(), &state.config.public_origin)
+        && !marketing_refresh
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "ok": false,
+                "error": "cross_site_request_rejected"
+            })),
+        )
+            .into_response();
+    }
+'''
+          app = replace_once(app, old_gate, new_gate, "same-origin exception")
+          app_path.write_text(app)
+
+          module = Path("src/app/marketing_session.rs")
+          module.parent.mkdir(parents=True, exist_ok=True)
+          module.write_text(r'''//! Token-blind session status and refresh endpoints for sonusauris.app.
+//!
+//! The static marketing origin never receives a Supabase access token, refresh
+//! token, user id, email, or other account data. It can only ask whether the
+//! host-only product session is valid and request a server-side token rotation.
+
+use axum::{
+    Json,
+    extract::State,
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode, header},
+    response::{IntoResponse, Response},
+};
+use axum_extra::extract::CookieJar;
+use serde::Serialize;
+use tracing::warn;
+
+use super::{
+    AppState, SESSION_COOKIE, SessionAccessError, current_session, removal_cookie,
+    session_needs_mfa,
+};
+use crate::{auth::AuthError, session::SessionError};
+
+const MARKETING_ORIGIN: &str = "https://sonusauris.app";
+const REFRESH_PATH: &str = "/auth/session/refresh";
+const REFRESH_AFTER_SECONDS: u64 = 50 * 60;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionStatus {
+    authenticated: bool,
+    refresh_after_seconds: u64,
+}
+
+pub(super) fn is_marketing_refresh(
+    method: &Method,
+    path: &str,
+    headers: &HeaderMap,
+) -> bool {
+    *method == Method::POST
+        && path == REFRESH_PATH
+        && has_exact_origin(headers, MARKETING_ORIGIN)
+}
+
+pub(super) async fn status(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    headers: HeaderMap,
+) -> Response {
+    if !session_origin_allowed(&headers, &state) {
+        return rejected_origin();
+    }
+
+    match current_session(&state, &jar).await {
+        Ok(_) => status_response(&headers, StatusCode::OK, true),
+        Err(SessionAccessError::Unauthorized) => {
+            let response = status_response(&headers, StatusCode::OK, false);
+            (jar.add(removal_cookie(state.config())), response).into_response()
+        }
+        Err(SessionAccessError::Unavailable) => {
+            status_response(&headers, StatusCode::SERVICE_UNAVAILABLE, false)
+        }
+    }
+}
+
+pub(super) async fn refresh(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    headers: HeaderMap,
+) -> Response {
+    if !session_origin_allowed(&headers, &state) {
+        return rejected_origin();
+    }
+
+    match force_refresh(&state, &jar).await {
+        Ok(()) => status_response(&headers, StatusCode::OK, true),
+        Err(SessionAccessError::Unauthorized) => {
+            let response = status_response(&headers, StatusCode::OK, false);
+            (jar.add(removal_cookie(state.config())), response).into_response()
+        }
+        Err(SessionAccessError::Unavailable) => {
+            status_response(&headers, StatusCode::SERVICE_UNAVAILABLE, false)
+        }
+    }
+}
+
+async fn force_refresh(state: &AppState, jar: &CookieJar) -> Result<(), SessionAccessError> {
+    let raw_token = jar
+        .get(SESSION_COOKIE)
+        .map(|cookie| cookie.value())
+        .ok_or(SessionAccessError::Unauthorized)?;
+    let session = state
+        .sessions
+        .load(raw_token)
+        .await
+        .map_err(|error| match error {
+            SessionError::NotFound | SessionError::Crypto(_) => SessionAccessError::Unauthorized,
+            SessionError::Database(_) => SessionAccessError::Unavailable,
+        })?;
+
+    let refreshed = match state.supabase.refresh(&session.refresh_token).await {
+        Ok(refreshed) => refreshed,
+        Err(AuthError::Rejected(_) | AuthError::Unauthorized) => {
+            let _ = state.sessions.revoke(session.id).await;
+            return Err(SessionAccessError::Unauthorized);
+        }
+        Err(error) => {
+            warn!(?error, "Supabase marketing-session refresh failed");
+            return Err(SessionAccessError::Unavailable);
+        }
+    };
+
+    if refreshed.user.id != session.user_id
+        || !state.config.permits(refreshed.user.email.as_deref())
+        || session_needs_mfa(&refreshed)
+    {
+        let _ = state.sessions.revoke(session.id).await;
+        return Err(SessionAccessError::Unauthorized);
+    }
+
+    state
+        .sessions
+        .update_tokens(session.id, &refreshed)
+        .await
+        .map_err(|_| SessionAccessError::Unavailable)?;
+    Ok(())
+}
+
+fn session_origin_allowed(headers: &HeaderMap, state: &AppState) -> bool {
+    has_exact_origin(headers, MARKETING_ORIGIN)
+        || has_exact_origin(headers, &state.config.public_origin)
+}
+
+fn has_exact_origin(headers: &HeaderMap, expected: &str) -> bool {
+    headers
+        .get(header::ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|origin| origin == expected)
+}
+
+fn status_response(
+    request_headers: &HeaderMap,
+    status: StatusCode,
+    authenticated: bool,
+) -> Response {
+    let mut response = (
+        status,
+        Json(SessionStatus {
+            authenticated,
+            refresh_after_seconds: REFRESH_AFTER_SECONDS,
+        }),
+    )
+        .into_response();
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, max-age=0"),
+    );
+    headers.insert(
+        HeaderName::from_static("pragma"),
+        HeaderValue::from_static("no-cache"),
+    );
+    headers.insert(
+        HeaderName::from_static("cross-origin-resource-policy"),
+        HeaderValue::from_static("same-site"),
+    );
+    headers.append(header::VARY, HeaderValue::from_static("Origin"));
+
+    if has_exact_origin(request_headers, MARKETING_ORIGIN) {
+        headers.insert(
+            header::ACCESS_CONTROL_ALLOW_ORIGIN,
+            HeaderValue::from_static(MARKETING_ORIGIN),
+        );
+        headers.insert(
+            header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+            HeaderValue::from_static("true"),
+        );
+    }
+    response
+}
+
+fn rejected_origin() -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        Json(serde_json::json!({
+            "ok": false,
+            "error": "cross_site_request_rejected"
+        })),
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn origin(value: &'static str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::ORIGIN, HeaderValue::from_static(value));
+        headers
+    }
+
+    #[test]
+    fn refresh_exception_is_exact_to_method_path_and_marketing_origin() {
+        let marketing = origin(MARKETING_ORIGIN);
+        assert!(is_marketing_refresh(
+            &Method::POST,
+            REFRESH_PATH,
+            &marketing
+        ));
+        assert!(!is_marketing_refresh(
+            &Method::GET,
+            REFRESH_PATH,
+            &marketing
+        ));
+        assert!(!is_marketing_refresh(
+            &Method::POST,
+            "/auth/sign-out",
+            &marketing
+        ));
+        assert!(!is_marketing_refresh(
+            &Method::POST,
+            REFRESH_PATH,
+            &origin("https://evil.example")
+        ));
+    }
+
+    #[test]
+    fn status_contract_is_token_blind_and_credentialed_cors() {
+        let payload = serde_json::to_string(&SessionStatus {
+            authenticated: true,
+            refresh_after_seconds: REFRESH_AFTER_SECONDS,
+        })
+        .unwrap();
+        assert_eq!(
+            payload,
+            r#"{"authenticated":true,"refreshAfterSeconds":3000}"#
+        );
+        for forbidden in ["token", "email", "user", "principal", "tenant"] {
+            assert!(!payload.contains(forbidden), "{payload}");
+        }
+
+        let response = status_response(&origin(MARKETING_ORIGIN), StatusCode::OK, true);
+        assert_eq!(
+            response.headers().get(header::ACCESS_CONTROL_ALLOW_ORIGIN),
+            Some(&HeaderValue::from_static(MARKETING_ORIGIN))
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS),
+            Some(&HeaderValue::from_static("true"))
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL),
+            Some(&HeaderValue::from_static("no-store, max-age=0"))
+        );
+    }
+}
+''')
+
+          docs = Path("docs/marketing-session-contract.md")
+          docs.parent.mkdir(parents=True, exist_ok=True)
+          docs.write_text('''# Marketing session status and refresh
+
+`sonusauris.app` is static. Authentication and session storage terminate at the
+Rust BFF on `user.sonusauris.app`. The marketing site calls two exact-origin
+endpoints with `credentials: include`:
+
+- `GET /auth/session/status` returns only
+  `{ "authenticated": boolean, "refreshAfterSeconds": 3000 }`.
+- `POST /auth/session/refresh` rotates the Supabase access/refresh pair inside
+  the encrypted database-backed browser session and returns the same token-blind
+  shape.
+
+Neither response includes a JWT, refresh token, principal, email, tenant, or
+account metadata. Responses are `no-store`; credentialed CORS is emitted only
+for `https://sonusauris.app`. The existing same-origin gate remains in force for
+every other mutation and WebSocket handshake.
+
+The browser performs an initial status read, refreshes authenticated sessions at
+the 50-minute mark, and recovers on focus, visibility, and online events.
+Periodic Background Sync is best effort only. Mobile clients should use the same
+50-minute target when the operating system grants background execution, and
+must always refresh on foreground/resume.
+
+This preserves the current Supabase-backed BFF session. Shared Auth customer-
+realm PKCE remains the target identity/session authority and should replace the
+direct Supabase ceremony only after the exact Sonus client registration and
+cutover canaries are deployed.
+''')
+          PY
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          components: rustfmt, clippy
+      - name: Format and validate patch
+        working-directory: sonus-auris-web-server.rs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git diff --check
+          ! grep -R -n -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' --exclude-dir=.git .
+          cargo check --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Stage exact tested source artifact
+        working-directory: sonus-auris-web-server.rs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../sonus-session-artifact/src/app ../sonus-session-artifact/docs
+          cp src/app.rs ../sonus-session-artifact/src/app.rs
+          cp src/app/marketing_session.rs ../sonus-session-artifact/src/app/marketing_session.rs
+          cp docs/marketing-session-contract.md ../sonus-session-artifact/docs/marketing-session-contract.md
+          git diff --binary > ../sonus-session-artifact/validated.patch
+          git diff --check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sonus-session-patch
+          path: sonus-session-artifact
+          if-no-files-found: error
+          retention-days: 1
