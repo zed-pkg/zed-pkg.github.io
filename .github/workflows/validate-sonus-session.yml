@@ -47,6 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          path: validator
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
           repository: sonus-auris/sonus-auris-web-server.rs
           ref: ${{ env.SONUS_SERVER_SHA }}
           path: sonus-auris-web-server.rs
@@ -66,5 +70,35 @@ jobs:
       - name: Apply deterministic session patch
         working-directory: sonus-auris-web-server.rs
         shell: bash
-        env:
-          MODULE_B64: Ly8hIFRva2VuLWJsaW5kIHNlc3Npb24gc3RhdHVzIGFuZCByZWZyZXNoIGVuZHBvaW50cyBmb3Igc29udXNhdXJpcy5hcHAuCi8vIQovLyEgVGhlIHN0YXRpYyBtYXJrZXRpbmcgb3JpZ2luIG5ldmVyIHJlY2VpdmVzIGEgU3VwYWJhc2UgYWNjZXNzIHRva2VuLCByZWZyZXNoCi8vISB0b2tlbiwgdXNlciBpZCwgZW1haWwsIG9yIG90aGVyIGFjY291bnQgZGF0YS4gSXQgY2FuIG9ubHkgYXNrIHdoZXRoZXIgdGhlCi8vISBob3N0LW9ubHkgcHJvZHVjdCBzZXNzaW9uIGlzIHZhbGlkIGFuZCByZXF1ZXN0IGEgc2VydmVyLXNpZGUgdG9rZW4gcm90YXRpb24uCgp1c2UgYXh1bTo6ewogICAgSnNvbiwKICAgIGV4dHJhY3Q6OlN0YXRlLAogICAgaHR0cDo6e0hlYWRlck1hcCwgSGVhZGVyTmFtZSwgSGVhZGVyVmFsdWUsIE1ldGhvZCwgU3RhdHVzQ29kZSwgaGVhZGVyfSwKICAgIHJlc3BvbnNlOjp7SW50b1Jlc3BvbnNlLCBSZXNwb25zZX0sCn07CnVzZSBheHVtX2V4dHJhOjpleHRyYWN0OjpDb29raWVKYXI7CnVzZSBzZXJkZTo6U2VyaWFsaXplOwp1c2UgdHJhY2luZzo6d2FybjsKCnVzZSBzdXBlcjo6ewogICAgQXBwU3RhdGUsIFNFU1NJT05fQ09PS0lFLCBTZXNzaW9uQWNjZXNzRXJyb3IsIGN1cnJlbnRfc2Vzc2lvbiwgcmVtb3ZhbF9jb29raWUsCiAgICBzZXNzaW9uX25lZWRzX21mYSwKfTsKdXNlIGNyYXRlOjphdXRoOjpBdXRoRXJyb3IsIHNlc3Npb246OlNlc3Npb25FcnJvcn07Cgpjb25zdCBNQVJLRVRJTkdfT1JJR0lOOiAmc3RyID0gImh0dHBzOi8vc29udXNhdXJpcy5hcHAiOwpjb25zdCBSRUZSRVNIX1BBVEg6ICZzdHIgPSAiL2F1dGgvc2Vzc2lvbi9yZWZyZXNoIjsKY29uc3QgUkVGUkVTSF9BRlRFUl9TRUNPTkRTOiB1NjQgPSA1MCAqIDYwOwoKI1tkZXJpdmUoRGVidWcsIFNlcmlhbGl6ZSldCiNbc2VyZGUocmVuYW1lX2FsbCA9ICJjYW1lbENhc2UiKV0Kc3RydWN0IFNlc3Npb25TdGF0dXMgewogICAgYXV0aGVudGljYXRlZDogYm9vbCwKICAgIHJlZnJlc2hfYWZ0ZXJfc2Vjb25kczogdTY0LAp9CgpwdWIoc3VwZXIpIGZuIGlzX21hcmtldGluZ19yZWZyZXNoKAogICAgbWV0aG9kOiAmTWV0aG9kLAogICAgcGF0aDogJnN0ciwKICAgIGhlYWRlcnM6ICZIZWFkZXJNYXAsCikgLT4gYm9vbCB7CiAgICAqbWV0aG9kID09IE1ldGhvZDo6UE9TVAogICAgICAgICYmIHBhdGggPT0gUkVGUkVTSF9QQVRICiAgICAgICAgJiYgaGFzX2V4YWN0X29yaWdpbihoZWFkZXJzLCBNQVJLRVRJTkdfT1JJR0lOKQp9CgpwdWIoc3VwZXIpIGFzeW5jIGZuIHN0YXR1cygKICAgIFN0YXRlKHN0YXRlKTogU3RhdGU8QXBwU3RhdGU+LAogICAgamFyOiBDb29raWVKYXIsCiAgICBoZWFkZXJzOiBIZWFkZXJNYXAsCikgLT4gUmVzcG9uc2UgewogICAgaWYgIXNlc3Npb25fb3JpZ2luX2FsbG93ZWQoJmhlYWRlcnMsICZzdGF0ZSkgewogICAgICAgIHJldHVybiByZWplY3RlZF9vcmlnaW4oKTsKICAgIH0KCiAgICBtYXRjaCBjdXJyZW50X3Nlc3Npb24oJnN0YXRlLCAmamFyKS5hd2FpdCB7CiAgICAgICAgT2soXykgPT4gc3RhdHVzX3Jlc3BvbnNlKCZoZWFkZXJzLCBTdGF0dXNDb2RlOjpPSywgdHJ1ZSksCiAgICAgICAgRXJyKFNlc3Npb25BY2Nlc3NFcnJvcjo6VW5hdXRob3JpemVkKSA9PiB7CiAgICAgICAgICAgIGxldCByZXNwb25zZSA9IHN0YXR1c19yZXNwb25zZSgmaGVhZGVycywgU3RhdHVzQ29kZTo6T0ssIGZhbHNlKTsKICAgICAgICAgICAgKGphci5hZGQocmVtb3ZhbF9jb29raWUoc3RhdGUuY29uZmlnKCkpKSwgcmVzcG9uc2UpLmludG9fcmVzcG9uc2UoKQogICAgICAgIH0KICAgICAgICBFcnIoU2Vzc2lvbkFjY2Vzc0Vycm9yOjpVbmF2YWlsYWJsZSkgPT4gewogICAgICAgICAgICBzdGF0dXNfcmVzcG9uc2UoJmhlYWRlcnMsIFN0YXR1c0NvZGU6OlNFUlZJQ0VfVU5BVkFJTEFCTEUsIGZhbHNlKQogICAgICAgIH0KICAgIH0KfQoKcHViKHN1cGVyKSBhc3luYyBmbiByZWZyZXNoKAogICAgU3RhdGUoc3RhdGUpOiBTdGF0ZTxBcHBTdGF0ZT4sCiAgICBqYXI6IENvb2tpZUphciwKICAgIGhlYWRlcnM6IEhlYWRlck1hcCwKKSAuLi4=
+        run: python3 ../validator/.validation/sonus/app_patch.py .
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          components: rustfmt, clippy
+      - name: Format and validate patch
+        working-directory: sonus-auris-web-server.rs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          git diff --check
+          ! grep -R -n -E '^(<<<<<<< .+|=======|>>>>>>> .+)$' --exclude-dir=.git .
+          cargo check --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+      - name: Stage exact tested source artifact
+        working-directory: sonus-auris-web-server.rs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../sonus-session-artifact/src/app ../sonus-session-artifact/docs
+          cp src/app.rs ../sonus-session-artifact/src/app.rs
+          cp src/app/marketing_session.rs ../sonus-session-artifact/src/app/marketing_session.rs
+          cp docs/marketing-session-contract.md ../sonus-session-artifact/docs/marketing-session-contract.md
+          git diff --binary > ../sonus-session-artifact/validated.patch
+          git diff --check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sonus-session-patch
+          path: sonus-session-artifact
+          if-no-files-found: error
+          retention-days: 1
