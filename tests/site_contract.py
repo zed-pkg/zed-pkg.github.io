@@ -36,6 +36,11 @@ EXPECTED_SDKS = (
     "Java",
     "Swift",
 )
+EXPECTED_ACCOUNT_LINKS = {
+    "Log in": "https://app.zpkg.net/login",
+    "Sign up": "https://app.zpkg.net/signup",
+    "Dashboard": "https://app.zpkg.net/dashboard",
+}
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -55,6 +60,16 @@ def server():
         httpd.shutdown()
         thread.join(timeout=5)
         httpd.server_close()
+
+
+def assert_account_navigation(page) -> None:
+    account = page.get_by_role("group", name="Account")
+    assert account.count() == 1
+    for label, expected_href in EXPECTED_ACCOUNT_LINKS.items():
+        link = account.get_by_role("link", name=label, exact=True)
+        assert link.count() == 1, f"missing {label} account action"
+        assert link.get_attribute("href") == expected_href
+        assert link.is_visible(), f"{label} is not visible"
 
 
 def main() -> None:
@@ -89,6 +104,8 @@ def main() -> None:
             page.goto(base_url, wait_until="networkidle")
             page.get_by_role("heading", name="Plan before publish").wait_for()
 
+            assert_account_navigation(page)
+
             cards = page.locator("a.repo[data-repo]")
             assert cards.count() == len(EXPECTED_REPOS)
             actual_repos = {
@@ -112,6 +129,7 @@ def main() -> None:
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             assert page.locator("#repos").is_visible()
             assert page.locator("#review").is_visible()
+            assert_account_navigation(page)
 
             assert not external_requests, external_requests
             assert not console_errors, console_errors
