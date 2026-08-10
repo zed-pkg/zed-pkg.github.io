@@ -20,13 +20,13 @@ function renderSessionState(nextAuthenticated) {
   if (nextAuthenticated) {
     primary.textContent = "User dashboard";
     primary.href = primary.dataset.dashboardHref || `${appOrigin}/dashboard`;
-    primary.setAttribute("aria-label", "Open user dashboard");
+    primary.setAttribute("aria-label", "User dashboard");
     signup.hidden = true;
     root.dataset.accountState = "authenticated";
   } else {
     primary.textContent = "Log in";
     primary.href = primary.dataset.loginHref || `${appOrigin}/login`;
-    primary.setAttribute("aria-label", "Log in to your account");
+    primary.setAttribute("aria-label", "Log in");
     signup.hidden = false;
     root.dataset.accountState = "anonymous";
   }
