@@ -101,4 +101,4 @@ jobs:
           name: sonus-session-patch
           path: sonus-session-artifact
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
