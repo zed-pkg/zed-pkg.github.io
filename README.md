@@ -36,9 +36,12 @@ python3 -m venv .venv-site-contract
 
 ## Pages setup (one-time)
 
-Repo Settings -> Pages -> Source: **GitHub Actions**. For the zpkg.tech
-custom domain later: add a `public/CNAME` file containing `zpkg.tech`,
-switch `site` in `astro.config.mjs`, and point DNS per `zed-infra`.
+Repo Settings -> Pages -> Source: **GitHub Actions**. The custom domain is
+`zpkg.net` (`public/CNAME`, `site` in `astro.config.mjs`); DNS and the
+cutover runbook live in `zed-infra` (`docs/dns-zpkg-net.md`). After DNS
+resolves, set the domain in Settings -> Pages (or
+`gh api -X PUT repos/zed-pkg/zed-pkg.github.io/pages -f cname=zpkg.net`)
+and enable **Enforce HTTPS** once GitHub issues the certificate.
 
 ## Governance
 
