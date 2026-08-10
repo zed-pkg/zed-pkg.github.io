@@ -11,6 +11,13 @@ const {
   title = "zed-pkg — install packages, not repositories",
   description = "zed-pkg is the universal package manager backed by the VCS hosts you already use: git, hg, jj and friends on GitHub, GitLab, Bitbucket, Codeberg, or your own servers. Lean, tag-verified artifacts; pnpm-style symlinks; container-first installs; self-hostable.",
 } = Astro.props;
+
+// Public content stays on zpkg.net. Authentication and account data terminate
+// at the Rust MASH web server on the product origin.
+const APP_ORIGIN = "https://app.zpkg.net";
+const LOGIN_URL = `${APP_ORIGIN}/login`;
+const SIGNUP_URL = `${APP_ORIGIN}/signup`;
+const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
 ---
 
 <!doctype html>
@@ -32,13 +39,22 @@ const {
           <img src="/logo-mark.svg" alt="" />
           <span>zed<span class="accent">-pkg</span></span>
         </a>
-        <div class="nav-links" aria-label="Primary navigation">
+        <div class="nav-links site-links" aria-label="Primary navigation">
           <a href="#how">How it works</a>
           <a href="#review">Release review</a>
           <a href="#containers">Containers</a>
           <a href="#pricing">Pricing</a>
           <a href="#repos">Repos</a>
           <a href="https://github.com/zed-pkg">GitHub</a>
+        </div>
+        <div class="account-links" role="group" aria-label="Account">
+          <a class="account-link" href={LOGIN_URL} data-account-action="login">Log in</a>
+          <a class="account-link account-signup" href={SIGNUP_URL} data-account-action="signup">
+            Sign up
+          </a>
+          <a class="account-link account-dashboard" href={DASHBOARD_URL} data-account-action="dashboard">
+            Dashboard
+          </a>
         </div>
       </div>
     </nav>
@@ -48,10 +64,101 @@ const {
         <img src="/logo-mark.svg" alt="zed-pkg" />
         <span>(c) 2026 zed-pkg contributors - MIT - built in Rust</span>
         <div class="links">
-          <a href="https://web.zpkg.net">web.zpkg.net</a>
+          <a href={APP_ORIGIN}>app.zpkg.net</a>
           <a href="https://github.com/zed-pkg">github.com/zed-pkg</a>
         </div>
       </div>
     </footer>
   </body>
 </html>
+
+<style>
+  .site-links {
+    min-width: 0;
+  }
+
+  .account-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .account-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: .84rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    transition: color .15s ease, border-color .15s ease, background .15s ease, transform .15s ease;
+  }
+
+  .account-link:hover {
+    color: var(--text);
+  }
+
+  .account-signup {
+    border-color: var(--border);
+    background: rgba(255, 255, 255, .02);
+  }
+
+  .account-signup:hover {
+    border-color: rgba(143, 211, 244, .55);
+    background: var(--blue-soft);
+  }
+
+  .account-dashboard {
+    border-color: var(--orange);
+    background: var(--orange);
+    color: #0a0a0b;
+    box-shadow: 0 8px 24px rgba(255, 122, 26, .2);
+  }
+
+  .account-dashboard:hover {
+    color: #0a0a0b;
+    background: #ff8f40;
+    transform: translateY(-1px);
+  }
+
+  .account-link:focus-visible {
+    outline: 3px solid rgba(143, 211, 244, .38);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 1040px) {
+    .site-links {
+      display: none;
+    }
+
+    .account-links {
+      margin-left: auto;
+    }
+  }
+
+  @media (max-width: 390px) {
+    .nav-inner {
+      height: auto;
+      min-height: 60px;
+      padding-block: 9px;
+      flex-wrap: wrap;
+    }
+
+    .account-links {
+      width: 100%;
+      justify-content: flex-end;
+    }
+
+    .account-link {
+      min-height: 32px;
+      padding-inline: 9px;
+      font-size: .8rem;
+    }
+  }
+</style>
