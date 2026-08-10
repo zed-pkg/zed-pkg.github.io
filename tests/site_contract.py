@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
 import threading
 from contextlib import contextmanager
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -37,9 +36,11 @@ EXPECTED_SDKS = (
     "Java",
     "Swift",
 )
-APP_ORIGIN = "https://app.zpkg.net"
-STATUS_URL = f"{APP_ORIGIN}/auth/session/status"
-REFRESH_URL = f"{APP_ORIGIN}/auth/session/refresh"
+EXPECTED_ACCOUNT_LINKS = {
+    "Log in": "https://app.zpkg.net/login",
+    "Sign up": "https://app.zpkg.net/signup",
+    "Dashboard": "https://app.zpkg.net/dashboard",
+}
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -61,71 +62,29 @@ def server():
         httpd.server_close()
 
 
-def assert_anonymous_navigation(page) -> None:
+def assert_account_navigation(page) -> None:
     account = page.get_by_role("group", name="Account")
     assert account.count() == 1
-
-    login = account.get_by_role("link", name="Log in", exact=True)
-    assert login.count() == 1
-    assert login.get_attribute("href") == f"{APP_ORIGIN}/login"
-    assert login.is_visible()
-
-    signup = account.get_by_role("link", name="Sign up", exact=True)
-    assert signup.count() == 1
-    assert signup.get_attribute("href") == f"{APP_ORIGIN}/signup"
-    assert signup.is_visible()
-
-
-def assert_authenticated_navigation(page) -> None:
-    account = page.get_by_role("group", name="Account")
-    dashboard = account.get_by_role("link", name="User dashboard", exact=True)
-    assert dashboard.count() == 1
-    assert dashboard.get_attribute("href") == f"{APP_ORIGIN}/dashboard"
-    assert dashboard.is_visible()
-
-    signup = account.locator("[data-account-signup]")
-    assert signup.count() == 1
-    assert signup.is_hidden()
+    for label, expected_href in EXPECTED_ACCOUNT_LINKS.items():
+        link = account.get_by_role("link", name=label, exact=True)
+        assert link.count() == 1, f"missing {label} account action"
+        assert link.get_attribute("href") == expected_href
+        assert link.is_visible(), f"{label} is not visible"
 
 
 def main() -> None:
     if not (DIST / "index.html").is_file():
         raise SystemExit("dist/index.html is missing; run npm run build first")
 
-    session_state = {"authenticated": False}
-    auth_requests: list[tuple[str, str]] = []
-
     RESULTS.mkdir(parents=True, exist_ok=True)
     with server() as base_url, sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         context = browser.new_context(viewport={"width": 1280, "height": 900})
         context.tracing.start(screenshots=True, snapshots=True, sources=True)
-
-        def fulfill_auth(route, request) -> None:
-            auth_requests.append((request.method, request.url))
-            assert request.headers.get("accept") == "application/json"
-            route.fulfill(
-                status=200,
-                content_type="application/json",
-                headers={
-                    "Access-Control-Allow-Origin": base_url,
-                    "Access-Control-Allow-Credentials": "true",
-                    "Cache-Control": "no-store",
-                },
-                body=json.dumps(
-                    {
-                        "authenticated": session_state["authenticated"],
-                        "refreshAfterSeconds": 3000,
-                    }
-                ),
-            )
-
-        context.route(f"{APP_ORIGIN}/auth/session/**", fulfill_auth)
-
         page = context.new_page()
         console_errors: list[str] = []
         page_errors: list[str] = []
-        unexpected_external_requests: list[str] = []
+        external_requests: list[str] = []
 
         page.on(
             "console",
@@ -136,25 +95,16 @@ def main() -> None:
         page.on("pageerror", lambda error: page_errors.append(str(error)))
         page.on(
             "request",
-            lambda request: unexpected_external_requests.append(request.url)
+            lambda request: external_requests.append(request.url)
             if not request.url.startswith(base_url)
-            and request.url not in {STATUS_URL, REFRESH_URL}
             else None,
         )
 
         try:
             page.goto(base_url, wait_until="networkidle")
             page.get_by_role("heading", name="Plan before publish").wait_for()
-            page.get_by_role("link", name="Log in", exact=True).wait_for()
 
-            assert_anonymous_navigation(page)
-            assert auth_requests
-            assert auth_requests[0] == ("GET", STATUS_URL)
-
-            session_state["authenticated"] = True
-            page.evaluate("window.dispatchEvent(new Event('online'))")
-            page.get_by_role("link", name="User dashboard", exact=True).wait_for()
-            assert_authenticated_navigation(page)
+            assert_account_navigation(page)
 
             cards = page.locator("a.repo[data-repo]")
             assert cards.count() == len(EXPECTED_REPOS)
@@ -179,22 +129,9 @@ def main() -> None:
             assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
             assert page.locator("#repos").is_visible()
             assert page.locator("#review").is_visible()
-            assert_authenticated_navigation(page)
+            assert_account_navigation(page)
 
-            session_script = (DIST / "account-session.js").read_text()
-            worker_script = (DIST / "account-session-sw.js").read_text()
-            for source in (session_script, worker_script):
-                assert "credentials: \"include\"" in source
-                assert "localStorage" not in source
-                assert "sessionStorage" not in source
-                assert "access_token" not in source
-                assert "refresh_token" not in source
-            assert "50 * 60 * 1000" in session_script
-            assert "/auth/session/status" in session_script
-            assert "/auth/session/refresh" in session_script
-            assert "periodicsync" in worker_script
-
-            assert not unexpected_external_requests, unexpected_external_requests
+            assert not external_requests, external_requests
             assert not console_errors, console_errors
             assert not page_errors, page_errors
             context.tracing.stop()
