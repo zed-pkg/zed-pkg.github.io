@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_WEB_SHA: 9e90774eb85d47355de2f25020e4689d6e964618
+  ZED_WEB_SHA: 418909b882696403041bbad5a475bec1dc7c2141
   ZED_INTERFACES_SHA: 5394b2e7b070354ee79a4c6ac79c26d6264970cd
 
 jobs:
