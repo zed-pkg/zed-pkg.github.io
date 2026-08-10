@@ -18,19 +18,36 @@ const APP_ORIGIN = "https://app.zpkg.net";
 const LOGIN_URL = `${APP_ORIGIN}/login`;
 const SIGNUP_URL = `${APP_ORIGIN}/signup`;
 const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'none'",
+  "object-src 'none'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'",
+  "img-src 'self' data:",
+  `connect-src ${APP_ORIGIN}`,
+  "frame-src 'none'",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "form-action 'self'",
+].join("; ");
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-account-origin={APP_ORIGIN}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content={contentSecurityPolicy} />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <script type="module" src="/account-session.js"></script>
   </head>
   <body>
     <nav>
@@ -47,13 +64,22 @@ const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
           <a href="#repos">Repos</a>
           <a href="https://github.com/zed-pkg">GitHub</a>
         </div>
-        <div class="account-links" role="group" aria-label="Account">
-          <a class="account-link" href={LOGIN_URL} data-account-action="login">Log in</a>
-          <a class="account-link account-signup" href={SIGNUP_URL} data-account-action="signup">
-            Sign up
+        <div class="account-links" role="group" aria-label="Account" aria-live="polite">
+          <a
+            class="account-link account-dashboard"
+            href={APP_ORIGIN}
+            data-account-primary
+            data-login-href={LOGIN_URL}
+            data-dashboard-href={DASHBOARD_URL}
+          >
+            Account
           </a>
-          <a class="account-link account-dashboard" href={DASHBOARD_URL} data-account-action="dashboard">
-            Dashboard
+          <a
+            class="account-link account-signup"
+            href={SIGNUP_URL}
+            data-account-signup
+          >
+            Sign up
           </a>
         </div>
       </div>
@@ -130,6 +156,10 @@ const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
   .account-link:focus-visible {
     outline: 3px solid rgba(143, 211, 244, .38);
     outline-offset: 2px;
+  }
+
+  [data-account-signup][hidden] {
+    display: none;
   }
 
   @media (max-width: 1040px) {
