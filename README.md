@@ -4,6 +4,21 @@ Marketing site for [zed-pkg](https://github.com/zed-pkg), built with Astro
 (no Jekyll). Deployed to GitHub Pages by `.github/workflows/deploy.yml` on
 every push to `main`.
 
+Zed supplements ecosystem-native package managers; it does not replace them.
+
+The public host contract is intentionally split by responsibility:
+
+- `zpkg.net` is this human-facing site;
+- `api.zpkg.net` is the package metadata and control-plane API;
+- `registry.zpkg.net` serves immutable artifacts;
+- `app.zpkg.net` is the canonical authenticated browser UI; and
+- `user.zpkg.net`, when enabled, is a permanent redirect to `app.zpkg.net`.
+
+Availability and promotion are governed by the organization [public registry
+reliability contract](https://github.com/zed-pkg/.github/blob/main/docs/PUBLIC_REGISTRY_RELIABILITY.md).
+Site copy must not imply that an endpoint is operational merely because its
+planned public name appears here.
+
 Brand palette: black `#0A0A0B` / `#050506`, orange `#FF7A1A`, baby blue
 `#8FD3F4`. Logo assets live in `public/` (`logo.svg`, `logo-mark.svg`,
 `favicon.svg`).

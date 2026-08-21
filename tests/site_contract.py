@@ -39,6 +39,9 @@ EXPECTED_SDKS = (
     "Java",
     "Swift",
 )
+CANONICAL_WORDING = (
+    "Zed supplements ecosystem-native package managers; it does not replace them."
+)
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -93,6 +96,11 @@ def install_session_contract(
 
 def assert_common_page_contract(page: Page) -> None:
     page.get_by_role("heading", name="Plan before publish").wait_for()
+
+    body = page.locator("body").inner_text()
+    assert CANONICAL_WORDING in body
+    assert "api.zpkg.net" in body
+    assert "registry.zpkg.net" in body
 
     cards = page.locator("a.repo[data-repo]")
     assert cards.count() == len(EXPECTED_REPOS)
@@ -149,6 +157,7 @@ def static_security_contract() -> None:
     assert "script-src 'self'" in html
     assert f"connect-src 'self' {APP_ORIGIN}" in html
     assert "/account-session.js" in html
+    assert CANONICAL_WORDING in html
 
     assert 'credentials: "include"' in page_client
     assert 'cache: "no-store"' in page_client

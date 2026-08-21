@@ -22,13 +22,14 @@ const repos = [
       <span class="eyebrow">v0.1 - early access</span>
       <h1>Install <span class="z">packages</span>, not repositories.</h1>
       <p class="lede">
-        zed-pkg is a universal package manager backed by the version-control
-        servers you already use - git, hg, jj and friends, on any forge.
-        Authors publish lean, tag-verified artifacts to
-        <a href="https://registry.zpkg.net">registry.zpkg.net</a>; your backing repo stays the
-        mirror and the source of truth. Consumers get one shared
-        content-addressed store per machine and pnpm-style symlinks per
-        project.
+        Zed supplements ecosystem-native package managers; it does not replace them.
+        It coordinates packages backed by the version-control servers you
+        already use - git, hg, jj and friends, on any forge. Authors publish
+        lean, tag-verified package metadata through
+        <code>api.zpkg.net</code>; immutable artifacts are downloaded from
+        <a href="https://registry.zpkg.net">registry.zpkg.net</a>. Your backing
+        repo remains the provenance source. Consumers get one shared
+        content-addressed store per machine and pnpm-style symlinks per project.
       </p>
       <div class="cta">
         <a class="btn primary mono" href="https://github.com/zed-pkg/zed-cli">brew install zed-pkg</a>
@@ -50,7 +51,8 @@ fetched 412 KiB <span class="c">(pruned artifact, not a clone)</span>
 <span class="b">verified</span> git tag v0.3.0 at HEAD
 packed 96 KiB <span class="c">(38 files - 27 excluded: tests, ci, readme)</span>
 published acme/http-kit@0.3.0
-  <span class="c">-&gt; https://registry.zpkg.net</span></pre>
+  <span class="c">metadata -&gt; https://api.zpkg.net</span>
+  <span class="c">artifact -&gt; https://registry.zpkg.net</span></pre>
     </div>
   </header>
 
@@ -144,9 +146,9 @@ zed publish</pre>
         <div class="step">
           <h3>Store</h3>
           <p>
-            zpkg.net records metadata in Postgres and streams the artifact to
-            Cloudflare R2 / S3, addressed by sha256. Your forge mirrors the
-            source; the registry serves the bytes.
+            The API records metadata in Postgres and writes the artifact to
+            verified S3-compatible storage, addressed by sha256. Your forge
+            anchors the source; the registry serves the immutable bytes.
           </p>
           <pre>sha256  9f3ac2...
 tag     v1.2.0
@@ -310,7 +312,7 @@ RUN --mount=type=cache,target=/root/.zed-pkg \
       <div class="section-head">
         <h2><span class="tick">##</span> Backed by the forges you already trust</h2>
         <p>
-          zpkg.net is the primary artifact host; the repo you declare in
+          registry.zpkg.net is the public artifact host; the repo you declare in
           <code>.zpkg.toml</code> is the mirror, the backup, and the
           provenance anchor.
         </p>
