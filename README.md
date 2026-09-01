@@ -9,8 +9,9 @@ Zed supplements ecosystem-native package managers; it does not replace them.
 The public host contract is intentionally split by responsibility:
 
 - `zpkg.net` is this human-facing site;
-- `api.zpkg.net` is the package metadata and control-plane API;
-- `registry.zpkg.net` serves immutable artifacts;
+- `api.zpkg.net` owns authenticated package and control-plane writes;
+- `registry.zpkg.net` serves public package and version metadata reads;
+- `cdn.zpkg.net` serves immutable artifact bytes;
 - `app.zpkg.net` is the canonical authenticated browser UI; and
 - `user.zpkg.net`, when enabled, is a permanent redirect to `app.zpkg.net`.
 

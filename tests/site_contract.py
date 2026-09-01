@@ -101,6 +101,7 @@ def assert_common_page_contract(page: Page) -> None:
     assert CANONICAL_WORDING in body
     assert "api.zpkg.net" in body
     assert "registry.zpkg.net" in body
+    assert "cdn.zpkg.net" in body
 
     cards = page.locator("a.repo[data-repo]")
     assert cards.count() == len(EXPECTED_REPOS)
