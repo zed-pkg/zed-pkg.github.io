@@ -1,0 +1,139 @@
+---
+import MarketingPage from "../../layouts/MarketingPage.astro";
+---
+
+<MarketingPage
+  title="Get started with zed-pkg"
+  description="Install the zed CLI, author a .zpkg.toml package, verify it locally, publish it, and restore dependencies from an exact lockfile."
+  eyebrow="Early access guide"
+  heading="From repository to verified package."
+  intro="Zed coordinates package artifacts across ecosystems while your source repository remains the provenance anchor. Start with the CLI, exercise the package locally, then publish only the files consumers need."
+  canonicalPath="/getting-started/"
+>
+  <a slot="actions" class="btn primary mono" href="https://github.com/zed-pkg/zed-cli">View zed-cli</a>
+  <a slot="actions" class="btn" href="https://github.com/zed-pkg/zed-cli/blob/main/README.md">Read the CLI reference</a>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Install the CLI</h2>
+      <p class="section-intro">
+        The Homebrew tap is the documented binary install path. Building from
+        source remains available for contributors and pinned internal builds.
+      </p>
+      <div class="page-grid">
+        <article class="page-card">
+          <span class="status-pill">Documented</span>
+          <h3>Homebrew</h3>
+          <pre class="code-block">brew tap zed-pkg/tap
+brew install zed-pkg
+zed --version</pre>
+        </article>
+        <article class="page-card">
+          <span class="status-pill">Contributors</span>
+          <h3>Build from source</h3>
+          <pre class="code-block">git clone https://github.com/zed-pkg/zed-cli
+cd zed-cli
+cargo install --path .</pre>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Binary-name note</strong>
+        <p>
+          The Zed editor also ships a <code>zed</code> command. Install this CLI
+          under a separate prefix or shell alias when both tools share a machine.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Author one package contract</h2>
+      <p class="section-intro">
+        Every authored package is identified as <code>org/name</code> and starts
+        with a repository-root <code>.zpkg.toml</code>. The CLI validates this
+        manifest offline before publication.
+      </p>
+      <pre class="code-block">[package]
+org = "acme"
+name = "http-kit"
+version = "0.1.0"
+license = "MIT"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/acme/http-kit"
+
+[install]
+dir = "zed_modules"
+adapter = "none"</pre>
+      <div class="page-grid three">
+        <article class="page-card">
+          <h3>1. Initialize</h3>
+          <p><code>zed init --org acme</code> writes the starting manifest in the current package repository.</p>
+        </article>
+        <article class="page-card">
+          <h3>2. Validate</h3>
+          <p><code>zed validate</code> checks the manifest and optional lock without network access or mutation.</p>
+        </article>
+        <article class="page-card">
+          <h3>3. Round-trip</h3>
+          <p><code>zed r2g</code> packs and consumes the artifact through an isolated file registry before release.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Publish, then consume exactly</h2>
+      <div class="page-grid">
+        <article class="page-card">
+          <h3>Publisher flow</h3>
+          <pre class="code-block">git tag v0.1.0
+zed r2g
+zed publish</pre>
+          <p>
+            Normal publication verifies a clean worktree and a matching version
+            tag, packs the pruned artifact, writes registry metadata, and mirrors
+            supported GitHub repositories.
+          </p>
+        </article>
+        <article class="page-card">
+          <h3>Consumer flow</h3>
+          <pre class="code-block">zed add acme/http-kit@^0.1
+zed install
+zed install --frozen</pre>
+          <p>
+            The first install resolves and records content identity. Frozen
+            installs replay the lock and fail rather than silently selecting a
+            different artifact.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Choose the install shape</h2>
+      <table class="decision-table">
+        <thead>
+          <tr><th>Mode</th><th>Use it for</th><th>Materialization</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>symlink</code></td>
+            <td>Developer workstations and repeated local projects</td>
+            <td>One content-addressed store, linked into <code>zed_modules/</code></td>
+          </tr>
+          <tr>
+            <td><code>copy</code></td>
+            <td>OCI layers, build contexts, and read-only runtime images</td>
+            <td>Self-contained project files copied from the verified store</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</MarketingPage>
