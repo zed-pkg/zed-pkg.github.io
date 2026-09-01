@@ -1,0 +1,158 @@
+---
+import MarketingPage from "../../layouts/MarketingPage.astro";
+---
+
+<MarketingPage
+  title="zed-pkg security model"
+  description="Review zed-pkg's provenance, immutable digest, permission, public-fallback, authentication, and package-execution security boundaries."
+  eyebrow="Security model"
+  heading="Verify identity before convenience."
+  intro="Package transport crosses repositories, registries, object storage, CI, and developer machines. Zed makes those boundaries explicit: immutable content identity, opt-in code execution, separated public and authenticated origins, and constrained fallback sources."
+  canonicalPath="/security/"
+>
+  <a slot="actions" class="btn primary" href="https://github.com/zed-pkg/zed-docs">Read security docs</a>
+  <a slot="actions" class="btn" href="https://github.com/zed-pkg/zed-cli/security">Security policy</a>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Core guarantees in the package path</h2>
+      <div class="page-grid three">
+        <article class="page-card">
+          <h3>Source provenance</h3>
+          <p>
+            Normal publication requires the declared VCS tag for the package
+            version to point at the released commit. The tag and commit are
+            recorded with package metadata and lock state.
+          </p>
+        </article>
+        <article class="page-card">
+          <h3>Content identity</h3>
+          <p>
+            Artifacts carry a SHA-256 and byte size. Installation checks the
+            archive before materialization, and frozen restore remains pinned
+            to the recorded digest rather than trusting a mutable filename.
+          </p>
+        </article>
+        <article class="page-card">
+          <h3>Immutable versions</h3>
+          <p>
+            A published version may be retried only when the bytes are
+            identical. A same-version, different-digest publish is refused
+            rather than silently replacing consumers' dependency history.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Package-authored code is not implicit</h2>
+      <p class="section-intro">
+        Fetching a dependency and executing its scripts are separate security
+        decisions. Zed keeps high-impact behavior off until the caller grants
+        the corresponding permission.
+      </p>
+      <table class="decision-table">
+        <thead>
+          <tr><th>Capability</th><th>Default</th><th>Explicit permission</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Dependency build commands</td>
+            <td>Off</td>
+            <td><code>--allow-build</code></td>
+          </tr>
+          <tr>
+            <td>Native package-manager prerequisites</td>
+            <td>Off</td>
+            <td><code>--allow-native-deps</code> and an optional pinned manager</td>
+          </tr>
+          <tr>
+            <td>Pre-install and post-install hooks</td>
+            <td>Off</td>
+            <td><code>--allow-install-hooks</code></td>
+          </tr>
+          <tr>
+            <td>Mirror metadata used for fresh range resolution</td>
+            <td>Not trusted automatically</td>
+            <td>Signed metadata plus the caller's mirror-metadata trust policy</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Public fallback must prove it is public</h2>
+      <div class="page-grid">
+        <article class="page-card">
+          <h3>Metadata checks</h3>
+          <ul>
+            <li>Repository identity and public visibility must match the requested coordinates.</li>
+            <li>Sidecar organization, package, version, SHA-256, size, and download URL are validated.</li>
+            <li>Only approved HTTPS GitHub Release or content-addressed CDN download shapes are accepted.</li>
+            <li>Fallback responses identify their source instead of impersonating the primary origin.</li>
+          </ul>
+        </article>
+        <article class="page-card">
+          <h3>Artifact checks</h3>
+          <ul>
+            <li>Every upstream redirect is validated against an allowlist.</li>
+            <li>Credentials, custom ports, and ambiguous hostnames are rejected.</li>
+            <li>A bounded positive content length is required before public proxying.</li>
+            <li>Artifact responses receive immutable caching and restrictive security headers.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Private stays private</strong>
+        <p>
+          A failed authenticated origin is not permission to probe private
+          objects through a public worker. Fallback applies only where an
+          independently public source satisfies the same coordinate and content
+          constraints.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>Authentication and static content are separated</h2>
+      <div class="page-grid">
+        <article class="page-card">
+          <h3>Public site</h3>
+          <p>
+            <code>zpkg.net</code> is static content with a restrictive Content
+            Security Policy. It does not store access or refresh tokens in
+            browser storage and uses the account origin only for a bounded
+            credentialed session-status request.
+          </p>
+        </article>
+        <article class="page-card">
+          <h3>Product and API origins</h3>
+          <p>
+            Account UI terminates at <code>app.zpkg.net</code>; authenticated
+            state changes terminate at the write API. Public registry and CDN
+            hosts remain read-oriented and cannot manufacture write authority.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <div class="wrap">
+      <h2>For CI and release automation</h2>
+      <ul class="prose-list">
+        <li>Pin exact source and harness commits when a test makes a production-readiness claim.</li>
+        <li>Use repository-scoped workflow tokens only for resources owned by that repository.</li>
+        <li>Never print credentials, embed them in sidecars, or upload token-bearing diagnostics.</li>
+        <li>Run <code>zed validate</code>, local round-trip tests, and frozen restore before publication.</li>
+        <li>Treat a green helper-level API test as complementary evidence, not a substitute for the real CLI path.</li>
+      </ul>
+    </div>
+  </section>
+</MarketingPage>
