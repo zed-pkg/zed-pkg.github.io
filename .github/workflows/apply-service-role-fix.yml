@@ -1,0 +1,36 @@
+name: Apply canonical service-role correction
+
+on:
+  push:
+    branches:
+      - agent/marketing-pages-20260901
+    paths:
+      - .agent/apply-service-role-fix.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[service-role-applied]') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/marketing-pages-20260901
+          fetch-depth: 0
+
+      - name: Apply reviewed text-only correction
+        run: |
+          set -euo pipefail
+          python3 .agent/apply-service-role-fix.py
+          rm .agent/apply-service-role-fix.py
+          rm .github/workflows/apply-service-role-fix.yml
+          rmdir .agent 2>/dev/null || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'docs(site): correct registry and CDN service roles [service-role-applied]'
+          git push origin HEAD:agent/marketing-pages-20260901
