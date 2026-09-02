@@ -1,0 +1,98 @@
+name: live zpkg.net site smoke
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/live-site-smoke.yml"
+      - "src/**"
+      - "public/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * *"
+  workflow_run:
+    workflows: ["deploy"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-zpkg-net-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  outside-in:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Require the deployed public routes and canonical service wording
+        env:
+          DEPLOYED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/zpkg-live-site"
+          mkdir -p "${root}"
+
+          fetch_page() {
+            local route="$1"
+            local name="$2"
+            local url="https://zpkg.net${route}?zed_smoke=${DEPLOYED_SHA}"
+            local status
+            status="$(
+              curl -sS --retry 8 --retry-all-errors --max-time 30 \
+                -H 'Accept: text/html' \
+                -H 'Cache-Control: no-cache' \
+                -H 'Pragma: no-cache' \
+                -D "${root}/${name}.headers" \
+                -o "${root}/${name}.html" \
+                -w '%{http_code}' \
+                "${url}"
+            )"
+            test "${status}" = 200 || {
+              echo "${url} returned HTTP ${status}" >&2
+              sed -n '1,60p' "${root}/${name}.headers" >&2
+              exit 1
+            }
+            grep -qi '^content-type: .*text/html' "${root}/${name}.headers"
+            printf '%s -> HTTP %s\n' "${url}" "${status}"
+          }
+
+          fetch_page / index
+          fetch_page /getting-started/ getting-started
+          fetch_page /architecture/ architecture
+          fetch_page /reliability/ reliability
+          fetch_page /security/ security
+          fetch_page /self-hosting/ self-hosting
+
+          grep -Fq 'href="/getting-started/"' "${root}/index.html"
+          grep -Fq 'href="/architecture/"' "${root}/index.html"
+          grep -Fq 'href="/reliability/"' "${root}/index.html"
+          grep -Fq 'href="/security/"' "${root}/index.html"
+          grep -Fq 'href="/self-hosting/"' "${root}/index.html"
+          grep -Fq 'cdn.zpkg.net' "${root}/index.html"
+          grep -Fq 'registry.zpkg.net' "${root}/index.html"
+
+          grep -Fq '<link rel="canonical" href="https://zpkg.net/getting-started/">' "${root}/getting-started.html"
+          grep -Fq '<link rel="canonical" href="https://zpkg.net/architecture/">' "${root}/architecture.html"
+          grep -Fq '<link rel="canonical" href="https://zpkg.net/reliability/">' "${root}/reliability.html"
+          grep -Fq '<link rel="canonical" href="https://zpkg.net/security/">' "${root}/security.html"
+          grep -Fq '<link rel="canonical" href="https://zpkg.net/self-hosting/">' "${root}/self-hosting.html"
+
+          python3 - "${root}" "${DEPLOYED_SHA}" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          deployed_sha = sys.argv[2]
+          pages = {}
+          for path in sorted(root.glob("*.html")):
+              body = path.read_bytes()
+              pages[path.stem] = {
+                  "bytes": len(body),
+                  "sha256": hashlib.sha256(body).hexdigest(),
+              }
+          print(json.dumps({"ok": True, "deployed_sha": deployed_sha, "pages": pages}, indent=2))
+          PY
