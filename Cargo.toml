@@ -7,6 +7,10 @@ description = "Backend-agnostic local LRU with optional Redis pub/sub and snapsh
 repository = "https://github.com/ores-redis-lru-cache/ores-lru-redis.rs"
 rust-version = "1.78"
 
+[workspace]
+resolver = "2"
+members = ["crates/ores-runtime-server"]
+
 [features]
 default = ["redis-backend"]
 redis-backend = ["dep:redis"]
