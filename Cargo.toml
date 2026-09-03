@@ -1,0 +1,35 @@
+[package]
+name = "ores-lru-redis"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Backend-agnostic local LRU with optional Redis pub/sub and snapshot reconciliation"
+repository = "https://github.com/ores-redis-lru-cache/ores-lru-redis.rs"
+rust-version = "1.78"
+
+[features]
+default = ["redis-backend"]
+redis-backend = ["dep:redis"]
+
+[dependencies]
+async-trait = "0.1"
+futures-util = "0.3"
+lru = "0.12"
+redis = { version = "0.27", features = ["aio", "connection-manager", "tokio-comp"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "deny"
+pedantic = "allow"
+nursery = "allow"
