@@ -94,6 +94,13 @@ struct RuntimeState {
 pub struct RuntimeEnv(Arc<RuntimeState>);
 
 impl RuntimeEnv {
+    /// Initialize local or Redis-synchronized runtime configuration before readiness.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the policy conflicts with a prior initialization,
+    /// required Redis configuration is absent, the backend cannot connect or
+    /// reconcile, or the cache/runtime configuration is invalid.
     pub async fn start(
         config: &RuntimeEnvConfig,
         contract: ServiceContract,
@@ -241,6 +248,7 @@ fn invalid(message: impl Into<String>) -> io::Error {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;

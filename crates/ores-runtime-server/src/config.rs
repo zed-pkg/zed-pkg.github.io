@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     time::Duration,
 };
 
@@ -41,6 +41,12 @@ pub struct Config {
 }
 
 impl Config {
+    /// Resolve process configuration through the checked `flags2env` contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid mapping contract, command-line input, typed
+    /// value, listener address, cache bound, or missing required Redis URL.
     pub fn from_process(contract: ServiceContract) -> Result<Self, BoxError> {
         contract.validate().map_err(invalid)?;
 
@@ -152,12 +158,4 @@ fn optional_bool(
 
 fn invalid(message: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message.into())
-}
-
-#[allow(dead_code)]
-fn _loopback_examples() -> (IpAddr, IpAddr) {
-    (
-        IpAddr::V4(Ipv4Addr::LOCALHOST),
-        IpAddr::V6(Ipv6Addr::LOCALHOST),
-    )
 }

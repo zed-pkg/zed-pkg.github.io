@@ -44,6 +44,12 @@ struct ReadyBody {
     probe: ProbeSnapshot,
 }
 
+/// Start the runtime server on a newly created Tokio runtime.
+///
+/// # Errors
+///
+/// Returns an error if the runtime cannot be created or service initialization,
+/// binding, cache synchronization, or serving fails.
 pub fn run(contract: ServiceContract) -> Result<(), BoxError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -51,6 +57,12 @@ pub fn run(contract: ServiceContract) -> Result<(), BoxError> {
     runtime.block_on(run_async(contract))
 }
 
+/// Start the runtime server inside the caller's Tokio runtime.
+///
+/// # Errors
+///
+/// Returns an error if configuration, tracing, cache initialization, listener
+/// binding, or the Axum server fails.
 pub async fn run_async(contract: ServiceContract) -> Result<(), BoxError> {
     let config = Config::from_process(contract)?;
     tracing_subscriber::fmt()
@@ -60,21 +72,18 @@ pub async fn run_async(contract: ServiceContract) -> Result<(), BoxError> {
 
     let runtime_env = RuntimeEnv::start(&config.runtime_env, contract).await?;
     let probes = Probes::new(config.revision, runtime_env);
-    let state = AppState {
-        contract,
-        probes: probes.clone(),
-    };
+    let draining = probes.clone();
+    let state = AppState { contract, probes };
     let listener = TcpListener::bind(config.bind).await?;
-    probes.mark_started();
+    state.probes.mark_started();
     tracing::info!(
         service = contract.service,
         address = %config.bind,
         cache_protocol = RuntimeEnv::protocol(),
-        cache_mode = probes.cache_mode(),
+        cache_mode = state.probes.cache_mode(),
         "runtime server listener ready"
     );
 
-    let draining = probes.clone();
     axum::serve(listener, app(state))
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
@@ -199,6 +208,7 @@ async fn shutdown_signal() {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
     use axum::{body::Body, http::Request};
