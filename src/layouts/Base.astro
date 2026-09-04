@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import "../styles/mobile-hardening.css";
+import AnnouncementBar from "../components/AnnouncementBar.astro";
 
 interface Props {
   title?: string;
@@ -59,6 +60,13 @@ const contentSecurityPolicy = [
     <script type="module" src="/account-session.js"></script>
   </head>
   <body>
+    <AnnouncementBar
+      storageKey="site-announcement:zed-pkg:v1"
+      message="Happy 2026, y’all!"
+      href="/getting-started/"
+      linkLabel="See what we’re building"
+      tone="electric"
+    />
     <nav>
       <div class="wrap nav-inner">
         <a class="brand" href="/">
