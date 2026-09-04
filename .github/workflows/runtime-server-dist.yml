@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 concurrency:
   group: runtime-server-dist-${{ github.ref }}
@@ -18,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact head
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Install Rust 1.85.1
@@ -28,8 +29,22 @@ jobs:
       - name: Verify formatting
         run: cargo fmt --all -- --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test
-        run: cargo test --workspace --all-features
+        run: cargo test --locked --workspace --all-features
+      - name: Test without the Redis backend
+        run: cargo test --locked -p ores-lru-redis --no-default-features
       - name: Build release
-        run: cargo build --workspace --release --all-features
+        run: cargo build --locked --workspace --release --all-features
+
+  rustsec:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Audit the locked dependency graph
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

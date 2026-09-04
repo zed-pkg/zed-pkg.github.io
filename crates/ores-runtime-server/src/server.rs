@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use axum::{
-    Json, Router,
     extract::State,
-    http::{HeaderValue, StatusCode, header::CACHE_CONTROL},
+    http::{header::CACHE_CONTROL, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
+    Json, Router,
 };
 use serde::Serialize;
 use tokio::{net::TcpListener, signal};

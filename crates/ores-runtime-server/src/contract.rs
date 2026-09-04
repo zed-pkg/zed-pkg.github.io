@@ -18,9 +18,10 @@ impl ServiceContract {
         if self.service.is_empty()
             || self.title.is_empty()
             || self.service.len() > 128
-            || !self.service.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
-            })
+            || !self
+                .service
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
         {
             return Err("service identity is invalid".to_owned());
         }

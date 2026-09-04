@@ -2,15 +2,15 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io,
     sync::{
-        Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
+        Arc, OnceLock,
     },
     time::Duration,
 };
 
 use ores_lru_redis::{
-    BackendSyncMode, CachePolicy, CacheState, LocalRuntime, RedisStore, RuntimeConfig,
-    SyncRuntime, is_sensitive_runtime_env_key,
+    is_sensitive_runtime_env_key, BackendSyncMode, CachePolicy, CacheState, LocalRuntime,
+    RedisStore, RuntimeConfig, SyncRuntime,
 };
 use tokio::sync::watch;
 
@@ -125,7 +125,11 @@ impl RuntimeEnv {
                 runtime_config,
             )?);
             runtime.reconcile_once().await?;
-            spawn_worker(Arc::clone(&runtime), shutdown_rx, Arc::clone(&worker_failed));
+            spawn_worker(
+                Arc::clone(&runtime),
+                shutdown_rx,
+                Arc::clone(&worker_failed),
+            );
             (RuntimeInner::Redis(runtime), CacheMode::Redis)
         } else {
             let runtime = Arc::new(LocalRuntimeType::local_only(
@@ -134,7 +138,11 @@ impl RuntimeEnv {
             )?);
             let cache = runtime.cache();
             cache.write().await.mark_ready_without_backend();
-            spawn_worker(Arc::clone(&runtime), shutdown_rx, Arc::clone(&worker_failed));
+            spawn_worker(
+                Arc::clone(&runtime),
+                shutdown_rx,
+                Arc::clone(&worker_failed),
+            );
             (RuntimeInner::Local(runtime), CacheMode::LocalOnly)
         };
 
@@ -163,12 +171,16 @@ impl RuntimeEnv {
         match &self.0.inner {
             RuntimeInner::Redis(runtime) => {
                 let cache = runtime.cache();
-                let state = cache.read().await.state();
+                let guard = cache.read().await;
+                let state = guard.state();
+                drop(guard);
                 state
             }
             RuntimeInner::Local(runtime) => {
                 let cache = runtime.cache();
-                let state = cache.read().await.state();
+                let guard = cache.read().await;
+                let state = guard.state();
+                drop(guard);
                 state
             }
         }
@@ -181,11 +193,17 @@ impl RuntimeEnv {
         let cached = match &self.0.inner {
             RuntimeInner::Redis(runtime) => {
                 let cache = runtime.cache();
-                cache.write().await.get(key)
+                let mut guard = cache.write().await;
+                let value = guard.get(key);
+                drop(guard);
+                value
             }
             RuntimeInner::Local(runtime) => {
                 let cache = runtime.cache();
-                cache.write().await.get(key)
+                let mut guard = cache.write().await;
+                let value = guard.get(key);
+                drop(guard);
+                value
             }
         };
         cached.or_else(|| self.0.baseline.get(key).cloned())
