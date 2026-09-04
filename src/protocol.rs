@@ -198,9 +198,7 @@ fn ensure_limit(kind: &'static str, actual: usize, max: usize) -> Result<()> {
 }
 
 pub(super) fn unix_timestamp_string() -> String {
-    time::OffsetDateTime::now_utc()
-        .format(&time::format_description::well_known::Rfc3339)
-        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_owned())
+    jiff::Timestamp::now().to_string()
 }
 
 #[cfg(test)]
@@ -270,5 +268,12 @@ mod tests {
             snapshot.validate_bounds(),
             Err(Error::InvalidEvent(_))
         ));
+    }
+
+    #[test]
+    fn generated_timestamp_is_bounded_rfc3339() {
+        let generated = unix_timestamp_string();
+        let _: jiff::Timestamp = generated.parse().expect("RFC 3339 timestamp");
+        assert!(generated.len() <= MAX_TIMESTAMP_BYTES);
     }
 }

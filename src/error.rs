@@ -34,6 +34,17 @@ pub enum Error {
     },
     #[error("invalid cache event or snapshot: {0}")]
     InvalidEvent(&'static str),
+    #[error("invalid rate-limit block: {0}")]
+    InvalidRateLimitBlock(&'static str),
+    #[error("rate-limit cache keys must be 64 lowercase hexadecimal characters")]
+    InvalidRateLimitPrincipalDigest,
+    #[error("rate-limit block expired at {expires_at_unix_ms}; observed at {observed_at_unix_ms}")]
+    ExpiredRateLimitBlock {
+        expires_at_unix_ms: u64,
+        observed_at_unix_ms: u64,
+    },
+    #[error("rate-limit cache capacity {requested} exceeds hard maximum {max}")]
+    RateLimitCacheCapacityExceeded { requested: usize, max: usize },
     #[error("{kind} size/count {actual} exceeds limit {max}")]
     PayloadLimitExceeded {
         kind: &'static str,
@@ -53,7 +64,13 @@ pub enum Error {
 
 impl Error {
     pub fn event_requires_reconcile(&self) -> bool {
-        matches!(self, Self::RevisionGap { .. })
+        matches!(
+            self,
+            Self::RevisionGap { .. }
+                | Self::InvalidRateLimitBlock(_)
+                | Self::InvalidRateLimitPrincipalDigest
+                | Self::ExpiredRateLimitBlock { .. }
+        )
     }
 
     pub fn event_context<'a>(&self, event: &'a CacheEvent) -> (&'a str, &'a str, u64) {

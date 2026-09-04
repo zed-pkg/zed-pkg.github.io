@@ -8,7 +8,7 @@ use std::{
 use flags2env::BundledFlags2Env;
 use serde::Deserialize;
 
-use crate::{BoxError, ServiceContract, runtime_env::RuntimeEnvConfig};
+use crate::{runtime_env::RuntimeEnvConfig, BoxError, ServiceContract};
 
 const CONTRACT_PATH: &str = ".cli-flags.toml";
 
