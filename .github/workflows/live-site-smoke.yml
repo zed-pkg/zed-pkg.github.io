@@ -29,6 +29,7 @@ jobs:
       - name: Require the deployed public routes and canonical service wording
         env:
           DEPLOYED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EXPECT_ACCOUNT_PAGE: ${{ github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
           root="${RUNNER_TEMP}/zpkg-live-site"
@@ -51,7 +52,6 @@ jobs:
             )"
             test "${status}" = 200 || {
               echo "${url} returned HTTP ${status}" >&2
-              sed -n '1,60p' "${root}/${name}.headers" >&2
               exit 1
             }
             grep -qi '^content-type: .*text/html' "${root}/${name}.headers"
@@ -64,6 +64,16 @@ jobs:
           fetch_page /reliability/ reliability
           fetch_page /security/ security
           fetch_page /self-hosting/ self-hosting
+
+          # A PR checks the currently deployed site, which cannot contain that
+          # PR's new page yet. After publication, the new route is mandatory.
+          if [ "${EXPECT_ACCOUNT_PAGE}" = true ]; then
+            fetch_page /account/ account
+            grep -Fq 'href="/account/"' "${root}/index.html"
+            grep -Fq '<link rel="canonical" href="https://zpkg.net/account/">' "${root}/account.html"
+            grep -Fq 'id="individual"' "${root}/account.html"
+            grep -Fq 'id="organization"' "${root}/account.html"
+          fi
 
           grep -Fq 'href="/getting-started/"' "${root}/index.html"
           grep -Fq 'href="/architecture/"' "${root}/index.html"

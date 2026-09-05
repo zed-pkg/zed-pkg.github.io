@@ -22,7 +22,8 @@ planned public name appears here.
 
 The public information architecture has dedicated guides at
 `/getting-started/`, `/architecture/`, `/reliability/`, `/security/`, and
-`/self-hosting/`. Route-specific canonical metadata and the generated sitemap
+`/self-hosting/`, plus individual and organization journeys at `/account/`.
+Route-specific canonical metadata and the generated sitemap
 are checked during the production build.
 
 Brand palette: black `#0A0A0B` / `#050506`, orange `#FF7A1A`, baby blue
@@ -31,15 +32,31 @@ Brand palette: black `#0A0A0B` / `#050506`, orange `#FF7A1A`, baby blue
 
 ## Develop
 
+Use Node 24.19.0 (`.node-version`, also pinned in CI). The resolved dependencies
+require at least Node 22.19.0. Astro 7.3.1 and the checking tools are pinned;
+install from the lockfile. The static build preserves HTML-aware whitespace.
+
 ```sh
 npm ci
+npm audit --audit-level=low
+npm run check
+npm run test:unit
 npm run dev      # http://localhost:4321
 npm run build    # static output in dist/
 ```
 
 ## Public claim contract
 
-The homepage names all eleven maintained zed-pkg repositories, the reviewed
+Account links, the deployment promotion gate, realm boundaries, and the bounded
+session-hint state machine are documented in [account rollout](docs/account-rollout.md).
+The public account page is available before hosted sign-in is promoted; its
+rollout notice must not be removed without deployed end-to-end evidence.
+
+`npm run check` uses pinned Astro/TypeScript checks (including the exhaustive
+JavaScript state map), and `npm run test:unit` checks presentation and parsing
+invariants. Both run in the public site contract workflow before the build.
+
+The homepage highlights eleven core zed-pkg repositories, the reviewed
 ten-language SDK matrix, and the credential-free release-plan review flow.
 `.github/workflows/site-contract.yml` builds the locked production site and
 uses Playwright Chromium to verify those claims, keyboard focus, responsive

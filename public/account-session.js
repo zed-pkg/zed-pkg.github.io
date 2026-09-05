@@ -1,7 +1,7 @@
-const DEFAULT_CHECK_INTERVAL_MS = 50 * 60 * 1000;
-const FAILURE_RETRY_INTERVAL_MS = 5 * 60 * 1000;
-const MIN_CHECK_INTERVAL_MS = 60 * 1000;
+import { accountPresentation, parseSessionHint, FAILURE_RETRY_INTERVAL_MS } from "./account-state.js";
+
 const REQUEST_TIMEOUT_MS = 10 * 1000;
+const MAX_RESPONSE_BYTES = 2048;
 const STATUS_PATH = "/auth/session/status";
 
 const root = document.documentElement;
@@ -16,24 +16,18 @@ function linksAreAvailable() {
   return primary instanceof HTMLAnchorElement && signup instanceof HTMLAnchorElement;
 }
 
-function renderSessionState(nextAuthenticated, dashboardHref) {
+function renderSessionState(state) {
   if (!linksAreAvailable()) {
     return;
   }
 
-  if (nextAuthenticated) {
-    primary.textContent = "User dashboard";
-    primary.href = dashboardHref;
-    primary.setAttribute("aria-label", "User dashboard");
-    signup.hidden = true;
-    root.dataset.accountState = "authenticated";
-  } else {
-    primary.textContent = "Log in";
-    primary.href = primary.dataset.loginHref || `${appOrigin}/login`;
-    primary.setAttribute("aria-label", "Log in");
-    signup.hidden = false;
-    root.dataset.accountState = "anonymous";
-  }
+  const presentation = accountPresentation(state);
+  primary.textContent = presentation.label;
+  primary.href = presentation.href;
+  primary.setAttribute("aria-label", presentation.label);
+  // Both onboarding journeys remain discoverable for existing accounts too.
+  signup.hidden = false;
+  root.dataset.accountState = state;
 }
 
 function scheduleNextCheck(delayMs) {
@@ -49,41 +43,27 @@ function jitteredDelay(baseDelayMs) {
   return Math.round(baseDelayMs * (1 + Math.random() * 0.1));
 }
 
-function safeCheckDelay(payload) {
-  const seconds = Number(payload?.check_after_seconds);
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return jitteredDelay(DEFAULT_CHECK_INTERVAL_MS);
+async function boundedPayload(response) {
+  if (!response.body || response.headers.get("content-type")?.split(";")[0].trim() !== "application/json") {
+    throw new TypeError("Session status is not JSON");
   }
-  const bounded = Math.min(
-    Math.max(seconds * 1000, MIN_CHECK_INTERVAL_MS),
-    DEFAULT_CHECK_INTERVAL_MS,
-  );
-  return jitteredDelay(bounded);
-}
-
-function safeDashboardHref(payload) {
-  const fallback = primary.dataset.dashboardHref || `${appOrigin}/dashboard`;
-  if (typeof payload?.dashboard_url !== "string") {
-    return fallback;
-  }
-
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let json = "";
   try {
-    const candidate = new URL(payload.dashboard_url);
-    const expected = new URL(fallback);
-    if (
-      candidate.origin === expected.origin &&
-      candidate.pathname === expected.pathname &&
-      candidate.search === "" &&
-      candidate.hash === "" &&
-      candidate.username === "" &&
-      candidate.password === ""
-    ) {
-      return candidate.href;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) throw new RangeError("Session status exceeded its bound");
+      json += decoder.decode(value, { stream: true });
     }
-  } catch {
-    // A malformed or non-canonical destination falls back to static navigation.
+    return JSON.parse(json + decoder.decode());
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
-  return fallback;
 }
 
 async function performSessionCheck() {
@@ -96,39 +76,39 @@ async function performSessionCheck() {
       credentials: "include",
       mode: "cors",
       cache: "no-store",
+      redirect: "error",
       headers: {
         Accept: "application/json",
       },
       signal: controller.signal,
     });
-    if (!response.ok) {
+    if (response.status !== 200) {
       throw new Error(`session status returned ${response.status}`);
     }
 
-    const payload = await response.json();
-    if (typeof payload?.authenticated !== "boolean") {
-      throw new TypeError("session status omitted authenticated state");
-    }
-
-    renderSessionState(payload.authenticated, safeDashboardHref(payload));
-    scheduleNextCheck(safeCheckDelay(payload));
+    const hint = parseSessionHint(await boundedPayload(response));
+    renderSessionState(hint.state);
+    scheduleNextCheck(jitteredDelay(hint.checkAfterMs));
   } catch {
-    // Network and server failures must not preserve stale authenticated UI.
-    renderSessionState(false, `${appOrigin}/dashboard`);
+    // An outage is not a logout. Remove stale authenticated presentation without
+    // pretending the customer authority returned a definite anonymous result.
+    renderSessionState("unavailable");
     scheduleNextCheck(jitteredDelay(FAILURE_RETRY_INTERVAL_MS));
   } finally {
     window.clearTimeout(timeout);
+    controller.abort();
   }
 }
 
 function readSession() {
-  if (!appOrigin || !linksAreAvailable()) {
+  if (appOrigin !== "https://app.zpkg.net" || !linksAreAvailable()) {
     return Promise.resolve();
   }
   if (checkPromise !== null) {
     return checkPromise;
   }
 
+  renderSessionState("unknown");
   checkPromise = performSessionCheck().finally(() => {
     checkPromise = null;
   });

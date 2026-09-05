@@ -1,0 +1,147 @@
+---
+import { accountJourneys, HOSTED_ONBOARDING_ENABLED } from "../lib/account-links";
+
+interface Props {
+  detailed?: boolean;
+}
+
+const { detailed = false } = Astro.props;
+---
+
+<div class="account-journeys" data-account-journeys>
+  {accountJourneys.map((journey) => (
+    <article
+      class:list={["journey-card", `journey-card--${journey.id}`]}
+      id={detailed ? journey.id : undefined}
+      data-journey={journey.id}
+      aria-labelledby={`journey-${journey.id}-title`}
+    >
+      <span class="journey-audience">{journey.audience}</span>
+      <h3 id={`journey-${journey.id}-title`}>{journey.title}</h3>
+      <p>{journey.description}</p>
+      {detailed && <ul>{journey.details.map((detail: string) => <li>{detail}</li>)}</ul>}
+      <div class="journey-actions">
+        {!detailed ? (
+          <a class="btn" href={`/account/#${journey.id}`}>
+            {journey.id === "individual" ? "Explore individual setup" : "Explore team setup"}
+            <span aria-hidden="true">→</span>
+          </a>
+        ) : HOSTED_ONBOARDING_ENABLED ? (
+          <>
+            <a class="btn primary" data-journey-sign-in href={journey.signInHref}>
+              {journey.signInLabel}
+            </a>
+            <a class="journey-secondary" data-journey-setup href={journey.setupHref}>
+              {journey.setupLabel}
+            </a>
+          </>
+        ) : (
+          <>
+            <span class="journey-pending" data-journey-pending aria-describedby="account-rollout">
+              {journey.signInLabel} · rollout pending
+            </span>
+            <a class="journey-secondary" href="/getting-started/">Get started with the CLI →</a>
+          </>
+        )}
+      </div>
+    </article>
+  ))}
+</div>
+
+<style>
+  .account-journeys {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .journey-card {
+    --journey-accent: var(--blue);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    padding: clamp(24px, 4vw, 36px);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--journey-accent);
+    border-radius: 16px;
+    background: linear-gradient(145deg, #10161d, var(--panel) 70%);
+    scroll-margin-top: 110px;
+  }
+
+  .journey-card--organization {
+    --journey-accent: var(--orange);
+    background: linear-gradient(145deg, #1b1510, var(--panel) 70%);
+  }
+
+  .journey-audience {
+    color: var(--journey-accent);
+    font: 600 .72rem/1.5 var(--mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  h3 {
+    margin: 14px 0;
+    font-size: clamp(1.45rem, 3vw, 1.9rem);
+    letter-spacing: -.025em;
+  }
+
+  p, li {
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  ul {
+    display: grid;
+    gap: 12px;
+    margin: 24px 0 0;
+    padding-left: 20px;
+    font-size: .9rem;
+  }
+
+  li::marker {
+    color: var(--journey-accent);
+  }
+
+  .journey-actions {
+    display: grid;
+    justify-items: start;
+    gap: 16px;
+    margin-top: auto;
+    padding-top: 30px;
+    width: 100%;
+  }
+
+  .journey-actions .btn {
+    gap: 12px;
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .journey-secondary {
+    color: var(--journey-accent);
+    text-underline-offset: .25em;
+    text-decoration: underline;
+    font-size: .9rem;
+  }
+
+  .journey-pending {
+    padding: 12px 14px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  a:focus-visible {
+    outline: 3px solid var(--journey-accent);
+    outline-offset: 5px;
+  }
+
+  @media (max-width: 700px) {
+    .account-journeys {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>
