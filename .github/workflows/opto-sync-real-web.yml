@@ -16,4 +16,6 @@ permissions:
 
 jobs:
   real-web:
-    uses: opto-sync/opto-sync-e2e/.github/workflows/real-web-app-reusable.yml@0560cd15a9c81aa7905b348a71c645354c1dad1f
+    uses: opto-sync/opto-sync-e2e/.github/workflows/real-web-app-reusable.yml@c8e03dda14251be2125afb01cfa2e219152d4c15
+    with:
+      mock_api_origin: https://app.zpkg.net
