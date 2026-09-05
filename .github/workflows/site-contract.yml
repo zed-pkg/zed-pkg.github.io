@@ -6,6 +6,8 @@ on:
       - ".github/workflows/site-contract.yml"
       - "package.json"
       - "package-lock.json"
+      - ".node-version"
+      - "astro.config.mjs"
       - "src/**"
       - "public/**"
       - "tests/**"
@@ -15,6 +17,8 @@ on:
       - ".github/workflows/site-contract.yml"
       - "package.json"
       - "package-lock.json"
+      - ".node-version"
+      - "astro.config.mjs"
       - "src/**"
       - "public/**"
       - "tests/**"
@@ -40,7 +44,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: "22"
+          node-version-file: .node-version
           cache: npm
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -51,6 +55,9 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --no-audit --no-fund
+          npm audit --audit-level=low
+          npm run check
+          npm run test:unit
           npm run build
 
       - name: Verify generated marketing routes and metadata

@@ -1,0 +1,77 @@
+---
+import MarketingPage from "../../layouts/MarketingPage.astro";
+import AccountJourneys from "../../components/AccountJourneys.astro";
+import { HOSTED_ONBOARDING_ENABLED } from "../../lib/account-links";
+---
+
+<MarketingPage
+  title="zed-pkg accounts — individuals and organizations"
+  description="Choose an individual or organization workspace, understand team membership, and follow the hosted-account rollout without sharing credentials."
+  eyebrow="One tool. Your own way to work."
+  heading="Start solo. Build together."
+  intro="Keep a small project simple, or give your team a shared home for packages. Choose how you want to work; your identity stays yours in either path."
+  canonicalPath="/account/"
+>
+  <a slot="actions" class="btn" href="#individual">I'm working on my own</a>
+  <a slot="actions" class="btn" href="#organization">I'm here with a team</a>
+
+  <section class="page-section" aria-labelledby="account-options">
+    <div class="wrap">
+      <h2 id="account-options">An account for you. A workspace for your work.</h2>
+      {!HOSTED_ONBOARDING_ENABLED && (
+        <aside class="callout" id="account-rollout" data-account-rollout="pending-deployment">
+          <strong>Hosted account setup is not available yet.</strong>
+          <p>
+            The individual and organization flows are being rolled out. Their sign-in
+            controls stay inactive until the hosted customer application is verified.
+            You can use the CLI and public guides in the meantime.
+          </p>
+        </aside>
+      )}
+      <AccountJourneys detailed />
+    </div>
+  </section>
+
+  <section class="page-section" aria-labelledby="account-next">
+    <div class="wrap">
+      <h2 id="account-next">What happens after sign-in?</h2>
+      <div class="page-grid three">
+        <article class="page-card">
+          <span class="status-pill">01 · Your identity</span>
+          <h3>A private sign-in handoff</h3>
+          <p>
+            Authentication belongs to the customer application and Shared Auth.
+            This marketing site never asks for your password, receives a sign-in
+            token, or stores your workspace membership.
+          </p>
+        </article>
+        <article class="page-card">
+          <span class="status-pill">02 · Your workspace</span>
+          <h3>Choose where you belong</h3>
+          <p>
+            The application checks your existing memberships. Choose a workspace
+            explicitly, create one if appropriate, or ask your organization owner
+            to grant membership. Signing in does not automatically join a team.
+          </p>
+        </article>
+        <article class="page-card">
+          <span class="status-pill">03 · Your packages</span>
+          <h3>Work within your permissions</h3>
+          <p>
+            Zed checks product roles before allowing package or membership changes.
+            Organization owners manage their own workspaces; they do not receive
+            access to the separate platform-administration system.
+          </p>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Just trying Zed?</strong>
+        <p>
+          Start with the <a href="/getting-started/">CLI walkthrough</a> and public
+          packages. You do not need to create a company workspace just to explore.
+          For a registry you operate yourself, see <a href="/self-hosting/">self-hosting</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+</MarketingPage>

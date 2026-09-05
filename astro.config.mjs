@@ -6,4 +6,7 @@ import { defineConfig } from "astro/config";
 // registry.zpkg.net the artifact surface, and app.zpkg.net the browser UI.
 export default defineConfig({
   site: "https://zpkg.net",
+  // Preserve HTML-aware spacing across inline elements after the Astro 7
+  // upgrade. This static site does not use JSX whitespace semantics.
+  compressHTML: true,
 });

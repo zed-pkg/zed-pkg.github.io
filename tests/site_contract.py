@@ -69,29 +69,39 @@ def install_session_contract(
     page_origin: str,
     response_state: dict[str, object],
     requests: list[tuple[str, str, dict[str, str]]],
-) -> None:
+) -> list[Route]:
+    stalled_routes: list[Route] = []
+
     def fulfill(route: Route) -> None:
         request = route.request
         requests.append((request.method, request.url, request.headers))
+        if response_state.get("abort"):
+            route.abort("failed")
+            return
+        if response_state.get("stall"):
+            stalled_routes.append(route)
+            return  # The real browser's AbortController must end this request.
         route.fulfill(
             status=int(response_state["status"]),
-            content_type="application/json",
+            content_type=str(response_state.get("content_type", "application/json")),
             headers={
                 "Access-Control-Allow-Origin": page_origin,
                 "Access-Control-Allow-Credentials": "true",
                 "Cache-Control": "no-store, max-age=0",
                 "Vary": "Origin",
+                "Location": "https://evil.invalid/never-follow",
             },
-            body=json.dumps(
+            body=response_state.get("body", json.dumps(
                 {
                     "authenticated": response_state["authenticated"],
                     "dashboard_url": f"{APP_ORIGIN}/dashboard",
                     "check_after_seconds": 3000,
                 }
-            ),
+            )),
         )
 
     context.route(STATUS_URL, fulfill)
+    return stalled_routes
 
 
 def assert_common_page_contract(page: Page) -> None:
@@ -127,10 +137,10 @@ def assert_anonymous_account(page: Page) -> None:
     assert account.count() == 1
 
     login = account.get_by_role("link", name="Log in", exact=True)
-    signup = account.get_by_role("link", name="Sign up", exact=True)
+    signup = account.get_by_role("link", name="Individuals & teams", exact=True)
     login.wait_for()
     assert login.get_attribute("href") == f"{APP_ORIGIN}/login"
-    assert signup.get_attribute("href") == f"{APP_ORIGIN}/signup"
+    assert signup.get_attribute("href") == "/account/"
     assert login.is_visible()
     assert signup.is_visible()
     assert page.locator("html").get_attribute("data-account-state") == "anonymous"
@@ -145,13 +155,51 @@ def assert_authenticated_account(page: Page) -> None:
     dashboard.wait_for()
     assert dashboard.get_attribute("href") == f"{APP_ORIGIN}/dashboard"
     assert dashboard.is_visible()
-    assert not signup.is_visible()
+    assert signup.is_visible()
+    assert signup.get_attribute("href") == "/account/"
     assert page.locator("html").get_attribute("data-account-state") == "authenticated"
+
+
+def assert_unavailable_account(page: Page) -> None:
+    page.locator("html[data-account-state='unavailable']").wait_for()
+    primary = page.locator("[data-account-primary]")
+    assert primary.inner_text() == "Account"
+    assert primary.get_attribute("href") == "/account/"
+    assert page.locator("[data-account-signup]").is_visible()
+
+
+def assert_account_page(page: Page, base_url: str) -> None:
+    page.goto(f"{base_url}/account/", wait_until="networkidle")
+    page.get_by_role("heading", name="Start solo. Build together.", exact=True).wait_for()
+    assert page.locator("[data-journey]").count() == 2
+    assert page.locator("#individual").is_visible()
+    assert page.locator("#organization").is_visible()
+    assert page.locator("form").count() == 0
+    if page.locator("[data-account-rollout='pending-deployment']").count():
+        assert page.locator("[data-journey-pending]").count() == 2
+        assert page.locator("[data-journey-sign-in]").count() == 0
+    else:
+        assert page.locator("[data-journey-sign-in]").count() == 2
+        for journey in ("individual", "organization"):
+            card = page.locator(f"[data-journey='{journey}']")
+            assert card.locator("[data-journey-sign-in]").get_attribute("href") == (
+                f"{APP_ORIGIN}/auth/sign-in?return_to=%2Fonboarding%2F{journey}"
+            )
+            assert card.locator("[data-journey-setup]").get_attribute("href") == (
+                f"{APP_ORIGIN}/onboarding/{journey}"
+            )
+    choice = page.get_by_role("link", name="I'm here with a team", exact=True)
+    choice.focus()
+    assert choice.evaluate("element => element === document.activeElement")
+    choice.press("Enter")
+    assert page.url.endswith("#organization")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
 def static_security_contract() -> None:
     html = (DIST / "index.html").read_text(encoding="utf-8")
     page_client = (ROOT / "public" / "account-session.js").read_text(encoding="utf-8")
+    state_client = (ROOT / "public" / "account-state.js").read_text(encoding="utf-8")
 
     assert "data-account-primary" in html
     assert "Account" in html
@@ -163,8 +211,10 @@ def static_security_contract() -> None:
     assert 'credentials: "include"' in page_client
     assert 'cache: "no-store"' in page_client
     assert "/auth/session/status" in page_client
-    assert "check_after_seconds" in page_client
-    assert "dashboard_url" in page_client
+    assert "check_after_seconds" in state_client
+    assert "dashboard_url" not in page_client
+    assert 'redirect: "error"' in page_client
+    assert "MAX_RESPONSE_BYTES = 2048" in page_client
     assert "AbortController" in page_client
     assert "checkPromise" in page_client
     assert "Math.random" in page_client
@@ -181,7 +231,7 @@ def static_security_contract() -> None:
         "Bearer",
     )
     for value in forbidden:
-        assert value not in page_client, value
+        assert value not in page_client + state_client, value
     assert not (ROOT / "public" / "account-session-sw.js").exists()
 
 
@@ -228,7 +278,7 @@ def main() -> None:
                 "status": 200,
                 "authenticated": authenticated,
             }
-            install_session_contract(
+            stalled_routes = install_session_contract(
                 context,
                 page_origin=base_url,
                 response_state=response_state,
@@ -261,15 +311,45 @@ def main() -> None:
                     page.evaluate("window.dispatchEvent(new Event('focus'))")
                 assert foreground_status.value.method == "GET"
 
-                if authenticated:
-                    response_state["status"] = 503
+                # Real fetch/body handling, from both previously-known states.
+                # Neither an HTTP error nor malformed input may claim logout.
+                for failure in (
+                    {"status": 401}, {"status": 404}, {"status": 503},
+                    {"status": 302}, {"status": 204}, {"status": 201},
+                    {"status": 200, "body": "not-json"},
+                    {"status": 200, "body": '{"authenticated":"false"}'},
+                    {"status": 200, "body": "[]"},
+                    {"status": 200, "body": "x" * 2049},
+                    {"status": 200, "content_type": "text/html"},
+                    {"status": 200, "body": b'\xff'},
+                    {"status": 200, "abort": True},
+                    {"status": 200, "stall": True},
+                ):
+                    response_state.clear()
+                    response_state.update({"status": 200, "authenticated": authenticated, **failure})
+                    requests_before = len(requests)
                     with page.expect_request(STATUS_URL) as failed_status:
                         page.evaluate("window.dispatchEvent(new Event('focus'))")
                     assert failed_status.value.method == "GET"
-                    page.get_by_role("link", name="Log in", exact=True).wait_for()
-                    assert_anonymous_account(page)
-                else:
-                    assert_anonymous_account(page)
+                    if failure.get("stall"):
+                        for event in ("online", "pageshow", "focus", "focus"):
+                            page.evaluate(f"window.dispatchEvent(new Event('{event}'))")
+                        assert len(requests) == requests_before + 1, "concurrent checks were not deduplicated"
+                    assert_unavailable_account(page)
+                    for stalled in stalled_routes:
+                        stalled.abort("failed")
+                    stalled_routes.clear()
+
+                    # Recovery requires fresh positive evidence, not old UI state.
+                    response_state.clear()
+                    response_state.update({"status": 200, "authenticated": authenticated})
+                    with page.expect_request(STATUS_URL):
+                        page.evaluate("window.dispatchEvent(new Event('online'))")
+                    page.locator(f"html[data-account-state='{state_name}']").wait_for()
+                    if authenticated:
+                        assert_authenticated_account(page)
+                    else:
+                        assert_anonymous_account(page)
 
                 assert requests
                 assert all(method == "GET" and url == STATUS_URL for method, url, _ in requests)
@@ -282,19 +362,15 @@ def main() -> None:
                 assert page.locator("#repos").is_visible()
                 assert page.locator("#review").is_visible()
                 if authenticated:
-                    assert_anonymous_account(page)
+                    assert_authenticated_account(page)
                 else:
                     assert_anonymous_account(page)
 
+                assert_account_page(page, base_url)
+
                 assert not external_requests, external_requests
-                if authenticated:
-                    assert console_errors, "the deliberate 503 was not observed"
-                    assert all(
-                        "503 (Service Unavailable)" in message
-                        for message in console_errors
-                    ), console_errors
-                else:
-                    assert not console_errors, console_errors
+                assert console_errors, "the deliberate failures were not observed"
+                assert all("Failed to load resource" in message for message in console_errors), console_errors
                 assert not page_errors, page_errors
                 context.tracing.stop()
             except BaseException:
@@ -306,6 +382,12 @@ def main() -> None:
                 raise
             finally:
                 context.close()
+        no_js = browser.new_context(java_script_enabled=False, viewport={"width": 320, "height": 740})
+        page = no_js.new_page()
+        assert_account_page(page, base_url)
+        assert page.locator("html").get_attribute("data-account-state") == "unknown"
+        assert page.locator("[data-account-primary]").get_attribute("href") == "/account/"
+        no_js.close()
         browser.close()
 
     print("zed-pkg public-site session contract passed")

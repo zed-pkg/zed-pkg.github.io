@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import "../styles/mobile-hardening.css";
 import AnnouncementBar from "../components/AnnouncementBar.astro";
+import { APP_ORIGIN } from "../lib/account-links";
 
 interface Props {
   title?: string;
@@ -20,9 +21,7 @@ const canonicalUrl = new URL(canonicalPath, SITE_ORIGIN).toString();
 
 // Public content stays on zpkg.net. Authentication and account data terminate
 // at the Rust MASH web server on the product origin.
-const APP_ORIGIN = "https://app.zpkg.net";
 const LOGIN_URL = `${APP_ORIGIN}/login`;
-const SIGNUP_URL = `${APP_ORIGIN}/signup`;
 const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -40,7 +39,7 @@ const contentSecurityPolicy = [
 ---
 
 <!doctype html>
-<html lang="en" data-account-origin={APP_ORIGIN}>
+<html lang="en" data-account-origin={APP_ORIGIN} data-account-state="unknown">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -57,7 +56,7 @@ const contentSecurityPolicy = [
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="zed-pkg" />
     <meta name="twitter:card" content="summary" />
-    <script type="module" src="/account-session.js"></script>
+    <script is:inline type="module" src="/account-session.js"></script>
   </head>
   <body>
     <AnnouncementBar
@@ -84,7 +83,7 @@ const contentSecurityPolicy = [
         <div class="account-links" role="group" aria-label="Account" aria-live="polite">
           <a
             class="account-link account-dashboard"
-            href={APP_ORIGIN}
+            href="/account/"
             data-account-primary
             data-login-href={LOGIN_URL}
             data-dashboard-href={DASHBOARD_URL}
@@ -93,10 +92,10 @@ const contentSecurityPolicy = [
           </a>
           <a
             class="account-link account-signup"
-            href={SIGNUP_URL}
+            href="/account/"
             data-account-signup
           >
-            Sign up
+            Individuals &amp; teams
           </a>
         </div>
       </div>
@@ -110,6 +109,8 @@ const contentSecurityPolicy = [
           <a href="/getting-started/">Get started</a>
           <a href="/reliability/">Reliability</a>
           <a href="/self-hosting/">Self-host</a>
+          <a href="/account/#individual">Individuals</a>
+          <a href="/account/#organization">Organizations</a>
           <a href={APP_ORIGIN}>app.zpkg.net</a>
           <a href="https://github.com/zed-pkg">GitHub</a>
         </div>
@@ -134,7 +135,7 @@ const contentSecurityPolicy = [
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 34px;
+    min-height: 44px;
     padding: 6px 10px;
     border: 1px solid transparent;
     border-radius: 8px;
@@ -192,7 +193,7 @@ const contentSecurityPolicy = [
     }
   }
 
-  @media (max-width: 390px) {
+  @media (max-width: 560px) {
     .nav-inner {
       height: auto;
       min-height: 60px;
@@ -206,7 +207,7 @@ const contentSecurityPolicy = [
     }
 
     .account-link {
-      min-height: 32px;
+      min-height: 44px;
       padding-inline: 9px;
       font-size: .8rem;
     }

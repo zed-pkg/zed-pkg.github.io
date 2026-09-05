@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import AccountJourneys from "../components/AccountJourneys.astro";
 
 const repos = [
   ["zed-cli", "The `zed` command: install, publish, release planning, find, and test-local (r2g)"],
@@ -36,6 +37,7 @@ const repos = [
       <div class="cta">
         <a class="btn primary mono" href="https://github.com/zed-pkg/zed-cli">brew install zed-pkg</a>
         <a class="btn" href="https://github.com/zed-pkg">Browse the code</a>
+        <a class="btn" href="/account/">Individuals &amp; teams</a>
       </div>
     </div>
     <div class="term">
@@ -57,6 +59,19 @@ published acme/http-kit@0.3.0
   <span class="c">artifact -&gt; https://cdn.zpkg.net</span></pre>
     </div>
   </header>
+
+  <section id="accounts" aria-labelledby="accounts-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="accounts-heading"><span class="tick">##</span> Start solo. Build together.</h2>
+        <p>
+          One-off exploration or a shared package workspace: choose your path
+          and see what is ready in the hosted-account rollout.
+        </p>
+      </div>
+      <AccountJourneys />
+    </div>
+  </section>
 
   <section id="why">
     <div class="wrap">
