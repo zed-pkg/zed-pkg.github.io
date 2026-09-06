@@ -7,8 +7,9 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "owls:materialize": "node scripts/materialize-owls.mjs",
+    "dev": "npm run owls:materialize && astro dev",
+    "build": "npm run owls:materialize && astro build",
     "preview": "astro preview",
     "check": "astro check --minimumFailingSeverity warning && npm run check:state",
     "check:state": "tsc --noEmit --allowJs --checkJs --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext public/account-state.js",
