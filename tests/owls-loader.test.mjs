@@ -19,7 +19,7 @@ test('Astro registers the zed-pkg loader', async () => {
 });
 test('bootstrap is immutable, intent-only, and credentialless', async () => {
   const client = await source('public/owls/marketing-loader.mjs');
-  for (const value of ['b0e687c88b652d25964c041e2fdd0222f512fddd', '3b92396e34ffd0ba6411261957e47dd62cf3b4a4', '93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476']) assert.match(client, new RegExp(value));
+  for (const value of ['231510f5d01046af657be42a5d4215be12622042', 'deae23537d27aed94bdc2510649f99393379a617', '93a44bbb96c751218e4c00d479e4c14358122a389acca16205b1e4d0dc5f9476']) assert.match(client, new RegExp(value));
   assert.match(client, /prepareOnIntent/);
   assert.doesNotMatch(client, /credentials\s*:/);
   assert.doesNotMatch(client, /unsafe-eval/);
