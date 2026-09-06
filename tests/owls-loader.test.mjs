@@ -2,11 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 const source = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 async function filesBelow(directory) {
+  const directoryPath = typeof directory === 'string' ? directory : fileURLToPath(directory);
   const results = [];
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
+  for (const entry of await readdir(directoryPath, { withFileTypes: true })) {
+    const path = join(directoryPath, entry.name);
     if (entry.isDirectory()) results.push(...await filesBelow(path)); else results.push(path);
   }
   return results;
