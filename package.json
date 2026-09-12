@@ -13,7 +13,10 @@
     "preview": "astro preview",
     "check": "astro check --minimumFailingSeverity warning && npm run check:state",
     "check:state": "tsc --noEmit --allowJs --checkJs --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext public/account-state.js",
-    "test:unit": "node --test tests/*.test.mjs"
+    "test:unit": "node --test tests/*.test.mjs",
+    "lint:ores": "if [ -f .ores-lint/lint.sh ]; then sh .ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
+    "prepublishOnly": "npm run lint:ores",
+    "prebuild": "npm run lint:ores"
   },
   "dependencies": {
     "astro": "7.3.1"
@@ -21,5 +24,13 @@
   "devDependencies": {
     "@astrojs/check": "0.9.10",
     "typescript": "5.9.3"
+  },
+  "oresLint": {
+    "note": "Declared, not installed. ores-lint resolves these from a global install - see .ores-lint/README.md",
+    "requires": {
+      "eslint": ">=9",
+      "typescript-eslint": ">=8 (optional; without it .ts files are skipped)"
+    },
+    "install": "npm i -g eslint typescript-eslint"
   }
 }
