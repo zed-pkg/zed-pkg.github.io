@@ -1,0 +1,88 @@
+name: browser runtime distribution
+
+on:
+  push:
+    branches:
+      - "dist/ores-browser-runtimes-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-runtimes-dist-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-closure:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify immutable provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'ORESoftware/ores-websocket' PROVENANCE.md
+          grep -F '8cceeaf7142c469bc7ef55c16dc51ae0f9aeb43e' PROVENANCE.md
+          grep -F 'ORESoftware/ores-sw.js' PROVENANCE.md
+          grep -F 'af40988742570008d3b7cc573b673fca97b28112' PROVENANCE.md
+          test -f Cargo.lock
+
+      - name: Install Rust 1.88
+        shell: bash
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.88.0
+
+      - name: Prove source-only Cargo closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 >/dev/null
+          cargo fmt --all -- --check
+          cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+          cargo test --locked --workspace --all-features
+          cargo build --locked --workspace --release --all-features
+
+  clean-consumer:
+    runs-on: ubuntu-24.04
+    needs: source-closure
+    steps:
+      - name: Install Rust 1.88
+        shell: bash
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+
+      - name: Resolve exact public snapshot without private credentials
+        shell: bash
+        env:
+          SNAPSHOT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$SNAPSHOT_SHA"
+          mkdir -p "$RUNNER_TEMP/ores-browser-runtime-consumer/src"
+          cat > "$RUNNER_TEMP/ores-browser-runtime-consumer/Cargo.toml" <<EOF
+          [package]
+          name = "ores-browser-runtime-consumer"
+          version = "0.0.0"
+          edition = "2021"
+          publish = false
+
+          [dependencies]
+          ores-websocket = { git = "https://github.com/zed-pkg/zed-pkg.github.io.git", rev = "$SNAPSHOT_SHA", package = "ores-websocket", features = ["axum"] }
+          ores-sw-axum08 = { git = "https://github.com/zed-pkg/zed-pkg.github.io.git", rev = "$SNAPSHOT_SHA", package = "ores-sw-axum08" }
+          EOF
+          cat > "$RUNNER_TEMP/ores-browser-runtime-consumer/src/main.rs" <<'EOF'
+          fn main() {
+              let _ = std::mem::size_of::<ores_websocket::Envelope>();
+              let _ = std::mem::size_of::<ores_sw_axum08::RuntimeConfig>();
+          }
+          EOF
+          cargo generate-lockfile --manifest-path "$RUNNER_TEMP/ores-browser-runtime-consumer/Cargo.toml"
+          cargo check --locked --manifest-path "$RUNNER_TEMP/ores-browser-runtime-consumer/Cargo.toml"
