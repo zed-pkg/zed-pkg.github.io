@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "ores-websocket",
+  "rust",
+  "rust/axum08",
+]
+resolver = "2"
