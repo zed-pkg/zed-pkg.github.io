@@ -75,13 +75,15 @@ jobs:
           publish = false
 
           [dependencies]
+          axum = "0.8"
           ores-websocket = { git = "https://github.com/zed-pkg/zed-pkg.github.io.git", rev = "$SNAPSHOT_SHA", package = "ores-websocket", features = ["axum"] }
           ores-sw-axum08 = { git = "https://github.com/zed-pkg/zed-pkg.github.io.git", rev = "$SNAPSHOT_SHA", package = "ores-sw-axum08" }
           EOF
           cat > "$RUNNER_TEMP/ores-browser-runtime-consumer/src/main.rs" <<'EOF'
           fn main() {
               let _ = std::mem::size_of::<ores_websocket::Envelope>();
-              let _ = std::mem::size_of::<ores_sw_axum08::RuntimeConfig>();
+              let router = axum::Router::<()>::new();
+              let _router = ores_sw_axum08::install(router);
           }
           EOF
           cargo generate-lockfile --manifest-path "$RUNNER_TEMP/ores-browser-runtime-consumer/Cargo.toml"
